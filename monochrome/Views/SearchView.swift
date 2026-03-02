@@ -100,7 +100,7 @@ struct TrackRow: View {
                 }
             }
         }) {
-            HStack(spacing: 12) {
+            HStack(spacing: 16) {
                 AsyncImage(url: MonochromeAPI().getImageUrl(id: track.album?.cover)) { phase in
                     if let image = phase.image {
                         image.resizable()
@@ -109,32 +109,51 @@ struct TrackRow: View {
                         Rectangle().fill(Theme.card)
                     }
                 }
-                .frame(width: 48, height: 48)
-                .cornerRadius(Theme.radiusSm)
+                .frame(width: 40, height: 40)
+                .cornerRadius(4)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(track.title)
                         .foregroundColor(Theme.foreground)
                         .font(.system(size: 16, weight: .medium))
                         .lineLimit(1)
-                    Text(track.artist?.name ?? "Unknown Artist")
-                        .font(.system(size: 14))
-                        .foregroundColor(Theme.mutedForeground)
-                        .lineLimit(1)
+                    
+                    HStack(spacing: 4) {
+                        Text(track.artist?.name ?? "Unknown Artist")
+                        if let year = track.releaseYear {
+                            Text("•")
+                            Text(year)
+                        }
+                    }
+                    .font(.system(size: 14))
+                    .foregroundColor(Theme.mutedForeground)
+                    .lineLimit(1)
                 }
                 
                 Spacer()
                 
-                Image(systemName: "play.circle")
+                Text(formatDuration(track.duration))
+                    .font(.system(size: 14))
                     .foregroundColor(Theme.mutedForeground)
-                    .font(.title3)
+                    .frame(width: 50, alignment: .trailing)
+                
+                Image(systemName: "ellipsis")
+                    .foregroundColor(Theme.mutedForeground)
+                    .font(.system(size: 14))
+                    .padding(.leading, 8)
             }
             .padding(.vertical, 8)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 16)
             .background(Color.clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func formatDuration(_ seconds: Int) -> String {
+        let mins = seconds / 60
+        let secs = seconds % 60
+        return String(format: "%d:%02d", mins, secs)
     }
 }
 

@@ -53,9 +53,10 @@ struct MiniPlayerView: View {
             
             // Progress Bar Mini
             GeometryReader { geometry in
+                let progress = audioPlayer.duration > 0 ? (audioPlayer.currentTime / audioPlayer.duration) : 0
                 Rectangle()
                     .fill(Color.white)
-                    .frame(width: geometry.size.width * 0.3, height: 2)
+                    .frame(width: max(0, min(geometry.size.width, geometry.size.width * progress)), height: 2)
             }
             .frame(height: 2)
             .padding(.horizontal, 12)

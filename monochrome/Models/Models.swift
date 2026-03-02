@@ -6,6 +6,12 @@ struct Track: Identifiable, Codable {
     let duration: Int
     let artist: Artist?
     let album: Album?
+    let streamStartDate: String?
+    
+    var releaseYear: String? {
+        guard let dateStr = streamStartDate, dateStr.count >= 4 else { return nil }
+        return String(dateStr.prefix(4))
+    }
 }
 
 struct Artist: Identifiable, Codable {

@@ -25,40 +25,51 @@ class MonochromeAPI {
         return apiResponse.data?.items ?? []
     }
     
+    struct TrackResponse: Codable {
+        let version: String?
+        let data: TrackData?
+    }
+    
+    struct TrackData: Codable {
+        let trackId: Int
+        let manifest: String?
+    }
+    
+    struct ManifestData: Codable {
+        let urls: [String]
+    }
+    
     func fetchStreamUrl(trackId: Int) async throws -> String? {
-        // The API returns the stream URL or manifest. For now we use QUALITY=HIGH.
-        guard let url = URL(string: "\(baseURL)/stream/?id=\(trackId)&quality=HIGH") else {
+        guard let url = URL(string: "\(baseURL)/track/?id=\(trackId)&quality=HIGH") else {
             throw URLError(.badURL)
         }
         
         var request = URLRequest(url: url)
         request.setValue("Monochrome-iOS/1.0", forHTTPHeaderField: "User-Agent")
         
-        let (data, _) = try await urlSession.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
         
-        // Attempt to decode as JSON which usually contains { "url": "..." } or similar
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let stringUrl = json["url"] as? String {
-                return stringUrl
-            }
-            if let streamUrl = json["streamUrl"] as? String {
-                return streamUrl
-            }
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            print("API returned \((response as? HTTPURLResponse)?.statusCode ?? 0) for track \(trackId)")
+            throw URLError(.badServerResponse)
         }
         
-        // If the API returns a raw string (or plain text)
-        if let plainString = String(data: data, encoding: .utf8), plainString.hasPrefix("http") {
-            return plainString
+        let apiResponse = try JSONDecoder().decode(TrackResponse.self, from: data)
+        guard let manifestBase64 = apiResponse.data?.manifest,
+              let manifestData = Data(base64Encoded: manifestBase64),
+              let manifest = try? JSONDecoder().decode(ManifestData.self, from: manifestData) else {
+            return nil
         }
         
-        return nil
+        return manifest.urls.first
     }
     
-    func getImageUrl(id: String?) -> URL? {
+    func getImageUrl(id: String?, size: Int = 320) -> URL? {
         guard let id = id, !id.isEmpty else { return nil }
         if id.hasPrefix("http") {
             return URL(string: id)
         }
-        return URL(string: "\(baseURL)/image/?id=\(id)")
+        let formattedId = id.replacingOccurrences(of: "-", with: "/")
+        return URL(string: "https://resources.tidal.com/images/\(formattedId)/\(size)x\(size).jpg")
     }
 }

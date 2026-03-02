@@ -60,6 +60,32 @@ struct NowPlayingView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 32)
                 
+                // Progress Bar
+                VStack(spacing: 8) {
+                    Slider(
+                        value: Binding(
+                            get: { audioPlayer.currentTime },
+                            set: { newValue in
+                                audioPlayer.seek(to: newValue)
+                            }
+                        ),
+                        in: 0...(audioPlayer.duration > 0 ? audioPlayer.duration : 1)
+                    )
+                    .tint(.white)
+                    
+                    HStack {
+                        Text(formatTime(audioPlayer.currentTime))
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                        Spacer()
+                        Text("-" + formatTime(audioPlayer.duration - audioPlayer.currentTime))
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+                .padding(.horizontal, 32)
+                .padding(.top, 16)
+                
                 Spacer()
                 
                 // Controls
@@ -91,5 +117,12 @@ struct NowPlayingView: View {
                 .padding(.bottom, 64)
             }
         }
+    }
+    
+    private func formatTime(_ time: TimeInterval) -> String {
+        guard time > 0 && !time.isNaN else { return "0:00" }
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }
