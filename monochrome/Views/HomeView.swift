@@ -5,6 +5,11 @@ struct HomeView: View {
     @Environment(AudioPlayerService.self) private var audioPlayer
     @Environment(LibraryManager.self) private var libraryManager
 
+    @State private var searchText = ""
+    @State private var searchResults: [Track] = []
+    @State private var isSearching = false
+    @State private var hasSearched = false
+
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         if hour < 12 { return "Good morning" }
@@ -13,6 +18,81 @@ struct HomeView: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            // Search bar (always pinned at top)
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16))
+                    .foregroundColor(Theme.mutedForeground)
+
+                TextField("What do you want to listen to?", text: $searchText)
+                    .font(.system(size: 16))
+                    .foregroundColor(Theme.foreground)
+                    .autocorrectionDisabled()
+                    .onSubmit { performSearch() }
+
+                if !searchText.isEmpty {
+                    Button(action: { searchText = ""; searchResults = []; hasSearched = false }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(Theme.mutedForeground)
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Theme.secondary)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
+            if hasSearched {
+                // Search results view (only after submit)
+                searchContent
+            } else {
+                // Home content (visible while typing too)
+                homeContent
+            }
+        }
+        .background(Theme.background)
+    }
+
+    // MARK: - Search Content
+
+    @ViewBuilder
+    private var searchContent: some View {
+        if isSearching {
+            Spacer()
+            ProgressView().tint(Theme.mutedForeground)
+            Spacer()
+        } else if !searchResults.isEmpty {
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(searchResults.enumerated()), id: \.element.id) { index, track in
+                        let queue = Array(searchResults.dropFirst(index + 1))
+                        TrackRow(track: track, queue: queue, showCover: true, navigationPath: $navigationPath)
+                    }
+                }
+                .padding(.bottom, 120)
+            }
+        } else if hasSearched {
+            Spacer()
+            VStack(spacing: 10) {
+                Text("No results for")
+                    .font(.system(size: 16))
+                    .foregroundColor(Theme.mutedForeground)
+                Text("\"\(searchText)\"")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Theme.foreground)
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - Home Content
+
+    private var homeContent: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
                 // Greeting header
@@ -20,7 +100,7 @@ struct HomeView: View {
                     .font(.system(size: 26, weight: .bold))
                     .foregroundColor(Theme.foreground)
                     .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .padding(.top, 8)
 
                 // Recently played
                 if !audioPlayer.playHistory.isEmpty || audioPlayer.currentTrack != nil {
@@ -49,7 +129,6 @@ struct HomeView: View {
                 Spacer(minLength: 100)
             }
         }
-        .background(Theme.background)
     }
 
     // MARK: - Recently Played
@@ -115,6 +194,20 @@ struct HomeView: View {
                     TrackRow(track: track, queue: queue, showCover: true, navigationPath: $navigationPath)
                 }
             }
+        }
+    }
+
+    // MARK: - Search
+
+    private func performSearch() {
+        guard !searchText.isEmpty else { return }
+        isSearching = true
+        hasSearched = true
+
+        Task {
+            do { searchResults = try await MonochromeAPI().searchTracks(query: searchText) }
+            catch { print("Search error: \(error)") }
+            isSearching = false
         }
     }
 }
