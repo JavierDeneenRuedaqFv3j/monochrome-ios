@@ -79,12 +79,32 @@ struct MiniPlayerView: View {
         .gesture(
             DragGesture(minimumDistance: 8)
                 .onChanged { value in
-                    let progress = -value.translation.height / UIScreen.main.bounds.height
-                    expansion = max(0, min(1, progress))
+                    let dx = abs(value.translation.width)
+                    let dy = abs(value.translation.height)
+                    // Only track vertical for expansion if mostly vertical
+                    if dy > dx {
+                        let progress = -value.translation.height / UIScreen.main.bounds.height
+                        expansion = max(0, min(1, progress))
+                    }
                 }
                 .onEnded { value in
-                    let velocity = -(value.predictedEndTranslation.height - value.translation.height)
-                    let progress = -value.translation.height / UIScreen.main.bounds.height
+                    let dx = value.translation.width
+                    let dy = value.translation.height
+                    let velocityX = value.predictedEndTranslation.width - value.translation.width
+
+                    // Horizontal swipe: skip tracks
+                    if abs(dx) > abs(dy) && (abs(dx) > 50 || abs(velocityX) > 300) {
+                        if dx < 0 {
+                            audioPlayer.nextTrack()
+                        } else {
+                            audioPlayer.previousTrack()
+                        }
+                        return
+                    }
+
+                    // Vertical swipe: expand
+                    let velocity = -(value.predictedEndTranslation.height - dy)
+                    let progress = -dy / UIScreen.main.bounds.height
 
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
                         if progress > 0.15 || velocity > 500 {

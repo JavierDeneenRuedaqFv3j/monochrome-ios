@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NowPlayingView: View {
     @Binding var expansion: CGFloat
+    @Binding var navigationPath: NavigationPath
 
     @Environment(AudioPlayerService.self) private var audioPlayer
     @Environment(LibraryManager.self) private var libraryManager
@@ -182,10 +183,27 @@ struct NowPlayingView: View {
                     .foregroundColor(.white)
                     .lineLimit(1)
 
-                Text(audioPlayer.currentArtistName)
-                    .font(.system(size: 15))
-                    .foregroundColor(.white.opacity(0.6))
-                    .lineLimit(1)
+                if let artist = audioPlayer.currentTrack?.artist {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            expansion = 0
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            navigationPath.append(artist)
+                        }
+                    }) {
+                        Text(audioPlayer.currentArtistName)
+                            .font(.system(size: 15))
+                            .foregroundColor(.white.opacity(0.6))
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text(audioPlayer.currentArtistName)
+                        .font(.system(size: 15))
+                        .foregroundColor(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 

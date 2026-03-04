@@ -10,9 +10,9 @@ struct MainTabView: View {
     private let fullScreenH = UIScreen.main.bounds.height
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            ZStack(alignment: .bottom) {
-                // Tab content — fills entire screen, scrolls behind bar
+        ZStack(alignment: .bottom) {
+            // Tab content inside NavigationStack — only content navigates
+            NavigationStack(path: $navigationPath) {
                 Group {
                     switch selectedTab {
                     case 0: HomeView(navigationPath: $navigationPath)
@@ -21,50 +21,50 @@ struct MainTabView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                // Glassmorphic bottom bar (mini player + tabs)
-                VStack(spacing: 0) {
-                    if audioPlayer.currentTrack != nil {
-                        MiniPlayerView(expansion: $playerExpansion)
-                            .opacity(playerExpansion > 0 ? 0 : 1)
-                            .allowsHitTesting(playerExpansion == 0)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
-
-                    HStack {
-                        TabBarButton(icon: "house.fill", label: "Home", isSelected: selectedTab == 0) { selectedTab = 0 }
-                        TabBarButton(icon: "books.vertical.fill", label: "Library", isSelected: selectedTab == 1) { selectedTab = 1 }
-                    }
-                    .padding(.top, 8)
-                    .padding(.bottom, -15)
+                .background(Theme.background)
+                .navigationBarHidden(true)
+                .navigationDestination(for: Artist.self) { artist in
+                    ArtistDetailView(artist: artist, navigationPath: $navigationPath)
                 }
-                .padding(.bottom, -15)
+            }
+
+            // Bottom bar: mini player + glassmorphic tab bar (always visible)
+            VStack(spacing: 6) {
+                if audioPlayer.currentTrack != nil {
+                    MiniPlayerView(expansion: $playerExpansion)
+                        .opacity(playerExpansion > 0 ? 0 : 1)
+                        .allowsHitTesting(playerExpansion == 0)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                HStack {
+                    TabBarButton(icon: "house.fill", label: "Home", isSelected: selectedTab == 0) { selectedTab = 0 }
+                    TabBarButton(icon: "books.vertical.fill", label: "Library", isSelected: selectedTab == 1) { selectedTab = 1 }
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 5)
                 .background(.ultraThinMaterial)
                 .overlay(alignment: .top) {
                     Rectangle()
                         .fill(Color.white.opacity(0.08))
                         .frame(height: 0.5)
                 }
-
-                // Full-screen player overlay
-                if audioPlayer.currentTrack != nil && playerExpansion > 0 {
-                    let effectiveExp = max(0, min(1,
-                        playerExpansion - (dragOffset / fullScreenH)
-                    ))
-                    let yOffset = (1 - effectiveExp) * fullScreenH
-
-                    NowPlayingView(expansion: $playerExpansion)
-                        .offset(y: yOffset)
-                        .allowsHitTesting(effectiveExp > 0.3)
-                        .gesture(closeDragGesture)
-                        .transition(.identity)
-                        .ignoresSafeArea()
-                }
             }
-            .background(Theme.background)
-            .navigationBarHidden(true)
-            .navigationDestination(for: Artist.self) { artist in
-                ArtistDetailView(artist: artist, navigationPath: $navigationPath)
+            .padding(.bottom, 5)
+
+            // Full-screen player overlay
+            if audioPlayer.currentTrack != nil && playerExpansion > 0 {
+                let effectiveExp = max(0, min(1,
+                    playerExpansion - (dragOffset / fullScreenH)
+                ))
+                let yOffset = (1 - effectiveExp) * fullScreenH
+
+                NowPlayingView(expansion: $playerExpansion, navigationPath: $navigationPath)
+                    .offset(y: yOffset)
+                    .allowsHitTesting(effectiveExp > 0.3)
+                    .gesture(closeDragGesture)
+                    .transition(.identity)
+                    .ignoresSafeArea()
             }
         }
         .preferredColorScheme(.dark)
