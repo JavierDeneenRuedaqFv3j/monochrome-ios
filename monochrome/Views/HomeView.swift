@@ -18,24 +18,28 @@ struct HomeView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Search bar (isolated view — typing won't re-render home content)
-            SearchBar(
-                onSearch: { query in
-                    lastQuery = query
-                    performSearch(query)
-                },
-                onClear: {
-                    searchResults = []
-                    hasSearched = false
-                    lastQuery = ""
+        ScrollView(showsIndicators: false) {
+            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                Section {
+                    if hasSearched {
+                        searchContent
+                    } else {
+                        homeContent
+                    }
+                } header: {
+                    SearchBar(
+                        onSearch: { query in
+                            lastQuery = query
+                            performSearch(query)
+                        },
+                        onClear: {
+                            searchResults = []
+                            hasSearched = false
+                            lastQuery = ""
+                        }
+                    )
+                    .background(.clear)
                 }
-            )
-
-            if hasSearched {
-                searchContent
-            } else {
-                homeContent
             }
         }
         .background(Theme.background)
@@ -46,21 +50,16 @@ struct HomeView: View {
     @ViewBuilder
     private var searchContent: some View {
         if isSearching {
-            Spacer()
             ProgressView().tint(Theme.mutedForeground)
-            Spacer()
+                .frame(maxWidth: .infinity)
+                .padding(.top, 80)
         } else if !searchResults.isEmpty {
-            ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(searchResults.enumerated()), id: \.element.id) { index, track in
-                        let queue = Array(searchResults.dropFirst(index + 1))
-                        TrackRow(track: track, queue: queue, showCover: true, navigationPath: $navigationPath)
-                    }
-                }
-                .padding(.bottom, 120)
+            ForEach(Array(searchResults.enumerated()), id: \.element.id) { index, track in
+                let queue = Array(searchResults.dropFirst(index + 1))
+                TrackRow(track: track, queue: queue, showCover: true, navigationPath: $navigationPath)
             }
-        } else if hasSearched {
-            Spacer()
+            Color.clear.frame(height: 120)
+        } else {
             VStack(spacing: 10) {
                 Text("No results for")
                     .font(.system(size: 16))
@@ -69,44 +68,43 @@ struct HomeView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(Theme.foreground)
             }
-            Spacer()
+            .frame(maxWidth: .infinity)
+            .padding(.top, 80)
         }
     }
 
     // MARK: - Home Content
 
     private var homeContent: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
-                Text(greeting)
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundColor(Theme.foreground)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
+        VStack(alignment: .leading, spacing: 24) {
+            Text(greeting)
+                .font(.system(size: 26, weight: .bold))
+                .foregroundColor(Theme.foreground)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
 
-                if !audioPlayer.playHistory.isEmpty || audioPlayer.currentTrack != nil {
-                    recentlyPlayed
-                }
-
-                if !libraryManager.favoriteTracks.isEmpty {
-                    favoritesSection
-                }
-
-                if audioPlayer.playHistory.isEmpty && audioPlayer.currentTrack == nil && libraryManager.favoriteTracks.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 52, weight: .light))
-                            .foregroundColor(Theme.mutedForeground.opacity(0.3))
-                        Text("Search for a track to get started")
-                            .font(.system(size: 16))
-                            .foregroundColor(Theme.mutedForeground)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 80)
-                }
-
-                Spacer(minLength: 100)
+            if !audioPlayer.playHistory.isEmpty || audioPlayer.currentTrack != nil {
+                recentlyPlayed
             }
+
+            if !libraryManager.favoriteTracks.isEmpty {
+                favoritesSection
+            }
+
+            if audioPlayer.playHistory.isEmpty && audioPlayer.currentTrack == nil && libraryManager.favoriteTracks.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 52, weight: .light))
+                        .foregroundColor(Theme.mutedForeground.opacity(0.3))
+                    Text("Search for a track to get started")
+                        .font(.system(size: 16))
+                        .foregroundColor(Theme.mutedForeground)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 80)
+            }
+
+            Color.clear.frame(height: 100)
         }
     }
 
@@ -220,11 +218,11 @@ private struct SearchBar: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Theme.secondary)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
     }
 }
 
