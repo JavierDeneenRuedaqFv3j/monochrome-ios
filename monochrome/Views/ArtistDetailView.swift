@@ -110,8 +110,8 @@ struct ArtistDetailView: View {
             }
 
             // Discography
-            if let detail = artistDetail, !detail.albums.isEmpty {
-                discography(detail.albums)
+            if let detail = artistDetail, (!detail.albums.isEmpty || !detail.eps.isEmpty) {
+                discography(albums: detail.albums, eps: detail.eps)
             }
 
             // About / Bio
@@ -201,16 +201,14 @@ struct ArtistDetailView: View {
     // MARK: - Discography
 
     @ViewBuilder
-    private func discography(_ albums: [Album]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Discography")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(Theme.foreground)
+    private func discography(albums: [Album], eps: [Album]) -> some View {
+        let allReleases = albums + eps
 
-                Spacer()
-            }
-            .padding(.horizontal, 16)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Discography")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(Theme.foreground)
+                .padding(.horizontal, 16)
 
             // Filter chips
             ScrollView(.horizontal, showsIndicators: false) {
@@ -231,11 +229,14 @@ struct ArtistDetailView: View {
             }
 
             // Albums grid
-            let filtered = filterAlbums(albums)
+            let filtered = filterReleases(allReleases)
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(alignment: .top, spacing: 14) {
                     ForEach(filtered) { album in
-                        AlbumCard(album: album)
+                        Button(action: { navigationPath.append(album) }) {
+                            AlbumCard(album: album)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -243,11 +244,11 @@ struct ArtistDetailView: View {
         }
     }
 
-    private func filterAlbums(_ albums: [Album]) -> [Album] {
+    private func filterReleases(_ releases: [Album]) -> [Album] {
         switch discoFilter {
-        case .all: return albums
-        case .albums: return albums.filter { ($0.numberOfTracks ?? 0) > 3 }
-        case .singles: return albums.filter { ($0.numberOfTracks ?? 0) <= 3 }
+        case .all: return releases
+        case .albums: return releases.filter { ($0.type?.uppercased() ?? "") != "EP" && ($0.type?.uppercased() ?? "") != "SINGLE" }
+        case .singles: return releases.filter { ($0.type?.uppercased() ?? "") == "EP" || ($0.type?.uppercased() ?? "") == "SINGLE" }
         }
     }
 
@@ -264,7 +265,6 @@ struct ArtistDetailView: View {
             // Bio card with artist image
             Button(action: { showFullBio = true }) {
                 VStack(alignment: .leading, spacing: 12) {
-                    // Artist image in card
                     AsyncImage(url: MonochromeAPI().getImageUrl(id: artist.picture, size: 480)) { phase in
                         if let image = phase.image {
                             image.resizable()
@@ -275,7 +275,6 @@ struct ArtistDetailView: View {
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                    // Popularity
                     if let pop = artistDetail?.popularity, pop > 0 {
                         HStack(spacing: 4) {
                             Text("\(formatNumber(pop * 10000))")
@@ -287,8 +286,7 @@ struct ArtistDetailView: View {
                         }
                     }
 
-                    // Bio preview
-                    Text(cleanHtml(text))
+                    Text(stripBioTags(text))
                         .font(.system(size: 14))
                         .foregroundColor(Theme.mutedForeground)
                         .lineLimit(3)
@@ -311,7 +309,6 @@ struct ArtistDetailView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Artist image
                     AsyncImage(url: MonochromeAPI().getImageUrl(id: artist.picture, size: 750)) { phase in
                         if let image = phase.image {
                             image.resizable()
@@ -335,11 +332,15 @@ struct ArtistDetailView: View {
                         .padding(.horizontal, 16)
                     }
 
-                    Text(cleanHtml(text))
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundColor(Theme.foreground.opacity(0.9))
-                        .lineSpacing(4)
-                        .padding(.horizontal, 16)
+                    BioTextView(text: text) { type, id in
+                        showFullBio = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            if type == "artist", let artistId = Int(id) {
+                                navigationPath.append(Artist(id: artistId, name: "", picture: nil))
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
 
                     Spacer(minLength: 40)
                 }
@@ -423,13 +424,190 @@ struct ArtistDetailView: View {
         return "\(n)"
     }
 
-    private func cleanHtml(_ text: String) -> String {
-        text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+    /// Strip all bracket tags, keeping just the display text
+    private func stripBioTags(_ text: String) -> String {
+        var clean = text
+        // [wimpLink artistId="xxx"]Name[/wimpLink]
+        clean = clean.replacingOccurrences(
+            of: #"\[wimpLink \w+Id="[^"]*"\](.*?)\[/wimpLink\]"#,
+            with: "$1", options: .regularExpression)
+        // [artist:xxx]Name[/artist]
+        clean = clean.replacingOccurrences(
+            of: #"\[(\w+):[^\]]*\](.*?)\[/\1\]"#,
+            with: "$2", options: .regularExpression)
+        // [[Name|ID]]
+        clean = clean.replacingOccurrences(
+            of: #"\[\[([^|]*)\|[^\]]*\]\]"#,
+            with: "$1", options: .regularExpression)
+        // Strip HTML tags
+        clean = clean.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        // HTML entities
+        clean = clean.replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+            .replacingOccurrences(of: "&#x27;", with: "'")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+        return clean.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+// MARK: - Bio Text View (parses bracket tags into tappable links)
+
+private enum BioSegment: Identifiable {
+    case text(String)
+    case link(type: String, id: String, name: String)
+
+    var id: String {
+        switch self {
+        case .text(let s): return "t_\(s.hashValue)"
+        case .link(_, let id, let name): return "l_\(id)_\(name)"
+        }
+    }
+}
+
+private struct BioTextView: View {
+    let text: String
+    let onLinkTap: (String, String) -> Void
+
+    var body: some View {
+        let segments = parseBio(text)
+        // Use Text concatenation for flow layout
+        segments.reduce(Text("")) { result, segment in
+            switch segment {
+            case .text(let str):
+                return result + Text(str)
+                    .font(.system(size: 15))
+                    .foregroundColor(Theme.foreground.opacity(0.9))
+            case .link(_, _, let name):
+                return result + Text(name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(Theme.foreground)
+                    .underline()
+            }
+        }
+        .lineSpacing(4)
+        // Overlay with invisible tappable buttons for each link
+        .overlay(
+            linkOverlay(segments: segments)
+        )
+    }
+
+    @ViewBuilder
+    private func linkOverlay(segments: [BioSegment]) -> some View {
+        // For links in bio text, we use .environment(\.openURL) approach
+        // by converting to AttributedString with link attributes
+        let attributed = buildAttributedString(segments)
+        Text(attributed)
+            .font(.system(size: 15))
+            .lineSpacing(4)
+            .foregroundColor(.clear) // invisible, just for tap handling
+            .environment(\.openURL, OpenURLAction { url in
+                if url.scheme == "monochrome" {
+                    let parts = url.pathComponents.filter { $0 != "/" }
+                    if parts.count >= 2 {
+                        onLinkTap(parts[0], parts[1])
+                    }
+                    return .handled
+                }
+                return .systemAction
+            })
+    }
+
+    private func buildAttributedString(_ segments: [BioSegment]) -> AttributedString {
+        var result = AttributedString()
+        for segment in segments {
+            switch segment {
+            case .text(let str):
+                result += AttributedString(str)
+            case .link(let type, let id, let name):
+                var attr = AttributedString(name)
+                attr.link = URL(string: "monochrome:///\(type)/\(id)")
+                result += attr
+            }
+        }
+        return result
+    }
+
+    private func parseBio(_ raw: String) -> [BioSegment] {
+        // Clean HTML first
+        var text = raw
+            .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
             .replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&nbsp;", with: " ")
             .replacingOccurrences(of: "&#x27;", with: "'")
             .replacingOccurrences(of: "&quot;", with: "\"")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var segments: [BioSegment] = []
+        let patterns: [(NSRegularExpression, (NSTextCheckingResult, String) -> (type: String, id: String, name: String)?)] = {
+            var p: [(NSRegularExpression, (NSTextCheckingResult, String) -> (type: String, id: String, name: String)?)] = []
+            // [wimpLink artistId="xxx"]Name[/wimpLink]
+            if let r = try? NSRegularExpression(pattern: #"\[wimpLink (\w+)Id="([^"]*)"\](.*?)\[/wimpLink\]"#) {
+                p.append((r, { match, str in
+                    guard match.numberOfRanges >= 4 else { return nil }
+                    let type = String(str[Range(match.range(at: 1), in: str)!])
+                    let id = String(str[Range(match.range(at: 2), in: str)!])
+                    let name = String(str[Range(match.range(at: 3), in: str)!])
+                    return (type, id, name)
+                }))
+            }
+            // [artist:xxx]Name[/artist]
+            if let r = try? NSRegularExpression(pattern: #"\[(\w+):([^\]]*)\](.*?)\[/\1\]"#) {
+                p.append((r, { match, str in
+                    guard match.numberOfRanges >= 4 else { return nil }
+                    let type = String(str[Range(match.range(at: 1), in: str)!])
+                    let id = String(str[Range(match.range(at: 2), in: str)!])
+                    let name = String(str[Range(match.range(at: 3), in: str)!])
+                    return (type, id, name)
+                }))
+            }
+            // [[Name|ID]]
+            if let r = try? NSRegularExpression(pattern: #"\[\[([^|]*)\|([^\]]*)\]\]"#) {
+                p.append((r, { match, str in
+                    guard match.numberOfRanges >= 3 else { return nil }
+                    let name = String(str[Range(match.range(at: 1), in: str)!])
+                    let id = String(str[Range(match.range(at: 2), in: str)!])
+                    return ("artist", id, name)
+                }))
+            }
+            return p
+        }()
+
+        // Find all matches across all patterns
+        struct MatchInfo {
+            let range: Range<String.Index>
+            let type: String
+            let id: String
+            let name: String
+        }
+
+        var allMatches: [MatchInfo] = []
+        let nsRange = NSRange(text.startIndex..., in: text)
+
+        for (regex, extractor) in patterns {
+            let matches = regex.matches(in: text, range: nsRange)
+            for match in matches {
+                guard let range = Range(match.range, in: text),
+                      let info = extractor(match, text) else { continue }
+                allMatches.append(MatchInfo(range: range, type: info.type, id: info.id, name: info.name))
+            }
+        }
+
+        // Sort by position
+        allMatches.sort { $0.range.lowerBound < $1.range.lowerBound }
+
+        // Build segments
+        var currentIndex = text.startIndex
+        for match in allMatches {
+            if currentIndex < match.range.lowerBound {
+                segments.append(.text(String(text[currentIndex..<match.range.lowerBound])))
+            }
+            segments.append(.link(type: match.type, id: match.id, name: match.name))
+            currentIndex = match.range.upperBound
+        }
+        if currentIndex < text.endIndex {
+            segments.append(.text(String(text[currentIndex...])))
+        }
+
+        return segments.isEmpty ? [.text(text)] : segments
     }
 }
 

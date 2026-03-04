@@ -127,6 +127,46 @@ class MonochromeAPI {
         return decoded
     }
 
+    // MARK: - Album Detail
+
+    func fetchAlbum(id: Int) async throws -> AlbumDetail {
+        guard let url = URL(string: "\(baseURL)/album/?id=\(id)") else { throw URLError(.badURL) }
+
+        let (data, response) = try await urlSession.data(for: request(for: url))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let root = json?["data"] as? [String: Any] ?? json ?? [:]
+
+        // Parse album metadata
+        var album: Album?
+        if root["numberOfTracks"] != nil || root["title"] != nil,
+           let albumData = try? JSONSerialization.data(withJSONObject: root),
+           let decoded = try? JSONDecoder().decode(Album.self, from: albumData) {
+            album = decoded
+        }
+
+        // Parse tracks from "items"
+        var tracks: [Track] = []
+        if let items = root["items"] as? [[String: Any]] {
+            for item in items {
+                let trackObj = item["item"] as? [String: Any] ?? item
+                if let trackData = try? JSONSerialization.data(withJSONObject: trackObj),
+                   let track = try? JSONDecoder().decode(Track.self, from: trackData) {
+                    tracks.append(track)
+                }
+            }
+
+            // If no album metadata, extract from first track
+            if album == nil, let firstTrack = tracks.first?.album {
+                album = firstTrack
+            }
+        }
+
+        guard let finalAlbum = album else { throw URLError(.cannotParseResponse) }
+        return AlbumDetail(album: finalAlbum, tracks: tracks)
+    }
+
     // MARK: - Stream URL
 
     struct TrackResponse: Codable {
@@ -169,6 +209,11 @@ class MonochromeAPI {
 }
 
 // MARK: - Artist Detail Model
+
+struct AlbumDetail {
+    let album: Album
+    let tracks: [Track]
+}
 
 struct ArtistDetail {
     let id: Int

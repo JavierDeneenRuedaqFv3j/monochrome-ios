@@ -171,6 +171,15 @@ struct NowPlayingView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(color: .black.opacity(0.5), radius: 30, y: 15)
+        .onTapGesture {
+            guard let album = audioPlayer.currentTrack?.album else { return }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                expansion = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                navigationPath.append(album)
+            }
+        }
     }
 
     // MARK: - Track Info
