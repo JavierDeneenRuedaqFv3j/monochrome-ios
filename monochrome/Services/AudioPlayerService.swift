@@ -34,6 +34,9 @@ class AudioPlayerService {
     private let currentTrackKey = "monochrome_current_track"
     private let playHistoryKey = "monochrome_play_history"
     private let savedTimestampKey = "monochrome_saved_timestamp"
+    private let queueKey = "monochrome_queued_tracks"
+    private let shuffleKey = "monochrome_is_shuffled"
+    private let originalQueueKey = "monochrome_original_queue"
     private var restoredTimestamp: TimeInterval = 0
 
     init() {
@@ -61,6 +64,7 @@ class AudioPlayerService {
             queuedTracks.shuffle()
             isShuffled = true
         }
+        saveState()
     }
 
     func removeFromQueue(at index: Int) {
@@ -69,6 +73,7 @@ class AudioPlayerService {
         if isShuffled {
             originalQueue.removeAll { $0.id == removed.id }
         }
+        saveState()
     }
 
     func moveInQueue(from source: IndexSet, to destination: Int) {
@@ -76,6 +81,7 @@ class AudioPlayerService {
         if isShuffled {
             originalQueue = queuedTracks
         }
+        saveState()
     }
 
     func play(track: Track, queue: [Track] = []) {
@@ -416,6 +422,17 @@ class AudioPlayerService {
         if let data = try? JSONEncoder().encode(historyToSave) {
             UserDefaults.standard.set(data, forKey: playHistoryKey)
         }
+
+        // Save queue and shuffle state
+        if let data = try? JSONEncoder().encode(queuedTracks) {
+            UserDefaults.standard.set(data, forKey: queueKey)
+        }
+        UserDefaults.standard.set(isShuffled, forKey: shuffleKey)
+        if isShuffled, let data = try? JSONEncoder().encode(originalQueue) {
+            UserDefaults.standard.set(data, forKey: originalQueueKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: originalQueueKey)
+        }
     }
 
     private func restoreState() {
@@ -423,6 +440,18 @@ class AudioPlayerService {
         if let data = UserDefaults.standard.data(forKey: playHistoryKey),
            let tracks = try? JSONDecoder().decode([Track].self, from: data) {
             self.playHistory = tracks
+        }
+
+        // Restore queue and shuffle state
+        if let data = UserDefaults.standard.data(forKey: queueKey),
+           let tracks = try? JSONDecoder().decode([Track].self, from: data) {
+            self.queuedTracks = tracks
+        }
+        self.isShuffled = UserDefaults.standard.bool(forKey: shuffleKey)
+        if isShuffled,
+           let data = UserDefaults.standard.data(forKey: originalQueueKey),
+           let tracks = try? JSONDecoder().decode([Track].self, from: data) {
+            self.originalQueue = tracks
         }
 
         // Restore current track (paused state, not auto-playing)
