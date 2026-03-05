@@ -6,6 +6,7 @@ struct NowPlayingView: View {
 
     @Environment(AudioPlayerService.self) private var audioPlayer
     @Environment(LibraryManager.self) private var libraryManager
+    @State private var showQueue = false
 
     // Real screen dimensions — always correct regardless of view hierarchy
     private let screenW = UIScreen.main.bounds.width
@@ -33,8 +34,8 @@ struct NowPlayingView: View {
         //   handle  3%  +  topBar  6%  +  gap  2%
         //   art    42%  (or less if width-capped)
         //   gap     3%  +  info   7%  +  gap  1.5%
-        //   prog    7%  +  gap    2%  +  ctrl 11%
-        //   gap     1%  +  queue  3.5%
+        //   prog    7%  +  gap  0.5%  +  ctrl 11%
+        //   gap     1%  +  queue  5%
         //   TOTAL: 89% → 11% breathing room
 
         ZStack {
@@ -75,9 +76,9 @@ struct NowPlayingView: View {
                 progressBar
                     .frame(height: usable * 0.07)
 
-                // -- Gap: 2% --
+                // -- Gap: 0.5% --
                 Color.clear
-                    .frame(height: usable * 0.02)
+                    .frame(height: usable * 0.005)
 
                 // -- Controls: 11% --
                 controls
@@ -87,9 +88,9 @@ struct NowPlayingView: View {
                 Color.clear
                     .frame(height: usable * 0.01)
 
-                // -- Queue: 3.5% --
+                // -- Queue: 5% --
                 queueInfo
-                    .frame(height: usable * 0.035)
+                    .frame(height: usable * 0.05)
             }
             .padding(.horizontal, padX)
             .padding(.top, safeT)
@@ -97,6 +98,10 @@ struct NowPlayingView: View {
         }
         .frame(width: screenW, height: screenH)
         .clipped()
+        .sheet(isPresented: $showQueue) {
+            QueueSheetView()
+                .environment(audioPlayer)
+        }
     }
 
     // MARK: - Background
@@ -289,12 +294,32 @@ struct NowPlayingView: View {
     // MARK: - Queue Info
 
     private var queueInfo: some View {
-        Group {
+        HStack {
+            Button(action: { audioPlayer.toggleShuffle() }) {
+                Image(systemName: "shuffle")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(.white.opacity(audioPlayer.isShuffled ? 1.0 : 0.4))
+            }
+            .frame(width: 44, height: 44)
+
+            Spacer()
+
             if !audioPlayer.queuedTracks.isEmpty {
-                Text("\(audioPlayer.queuedTracks.count) track\(audioPlayer.queuedTracks.count > 1 ? "s" : "") in queue")
-                    .font(.system(size: 12))
+                Button(action: { showQueue = true }) {
+                    Text("\(audioPlayer.queuedTracks.count) track\(audioPlayer.queuedTracks.count > 1 ? "s" : "") in queue")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+            }
+
+            Spacer()
+
+            Button(action: { showQueue = true }) {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
             }
+            .frame(width: 44, height: 44)
         }
     }
 

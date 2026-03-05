@@ -3,6 +3,7 @@ import AVFoundation
 import MediaPlayer
 import Observation
 import UIKit
+import SwiftUI
 
 @Observable
 class AudioPlayerService {
@@ -23,6 +24,8 @@ class AudioPlayerService {
     // Queue support
     var queuedTracks: [Track] = []
     var playHistory: [Track] = []
+    var isShuffled: Bool = false
+    private var originalQueue: [Track] = []
 
     var hasPreviousTrack: Bool { !playHistory.isEmpty }
     var hasNextTrack: Bool { !queuedTracks.isEmpty }
@@ -48,6 +51,33 @@ class AudioPlayerService {
         }
     }
 
+    func toggleShuffle() {
+        if isShuffled {
+            queuedTracks = originalQueue
+            originalQueue = []
+            isShuffled = false
+        } else {
+            originalQueue = queuedTracks
+            queuedTracks.shuffle()
+            isShuffled = true
+        }
+    }
+
+    func removeFromQueue(at index: Int) {
+        guard queuedTracks.indices.contains(index) else { return }
+        let removed = queuedTracks.remove(at: index)
+        if isShuffled {
+            originalQueue.removeAll { $0.id == removed.id }
+        }
+    }
+
+    func moveInQueue(from source: IndexSet, to destination: Int) {
+        queuedTracks.move(fromOffsets: source, toOffset: destination)
+        if isShuffled {
+            originalQueue = queuedTracks
+        }
+    }
+
     func play(track: Track, queue: [Track] = []) {
         // Clean up previous observer if any
         removeTimeObserver()
@@ -58,6 +88,8 @@ class AudioPlayerService {
         }
 
         self.queuedTracks = queue
+        self.isShuffled = false
+        self.originalQueue = []
         self.currentTrack = track
         self.currentTrackTitle = track.title
         self.currentArtistName = track.artist?.name ?? "Unknown Artist"
@@ -250,7 +282,15 @@ class AudioPlayerService {
         }
 
         let next = queuedTracks.removeFirst()
+        if isShuffled {
+            originalQueue.removeAll { $0.id == next.id }
+        }
+
+        let wasShuffled = isShuffled
+        let savedOriginal = originalQueue
         play(track: next, queue: queuedTracks)
+        isShuffled = wasShuffled
+        originalQueue = savedOriginal
     }
 
     func previousTrack() {
