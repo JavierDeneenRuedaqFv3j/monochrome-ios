@@ -58,13 +58,24 @@ class MonochromeAPI {
             let contentJson = try? JSONSerialization.jsonObject(with: contentData) as? [String: Any]
 
             // Tracks: top-level "tracks" array
-            if let tracksArray = contentJson?["tracks"] as? [[String: Any]],
-               let tracksData = try? JSONSerialization.data(withJSONObject: tracksArray),
-               let decoded = try? JSONDecoder().decode([Track].self, from: tracksData) {
-                topTracks = decoded
-                    .sorted { ($0.popularity ?? 0) > ($1.popularity ?? 0) }
-                    .prefix(15)
-                    .map { $0 }
+            if let tracksArray = contentJson?["tracks"] as? [[String: Any]] {
+                // Inject artist info into each track (API doesn't embed it)
+                var artistDict: [String: Any] = ["id": id, "name": name]
+                if let pic = picture { artistDict["picture"] = pic }
+                let enriched = tracksArray.map { track -> [String: Any] in
+                    var t = track
+                    if (t["artist"] as? [String: Any]) == nil {
+                        t["artist"] = artistDict
+                    }
+                    return t
+                }
+                if let tracksData = try? JSONSerialization.data(withJSONObject: enriched),
+                   let decoded = try? JSONDecoder().decode([Track].self, from: tracksData) {
+                    topTracks = decoded
+                        .sorted { ($0.popularity ?? 0) > ($1.popularity ?? 0) }
+                        .prefix(15)
+                        .map { $0 }
+                }
             }
 
             // Albums: "albums" -> "items"
