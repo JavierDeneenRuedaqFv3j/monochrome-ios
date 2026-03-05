@@ -6,8 +6,11 @@ struct AlbumDetailView: View {
     @Environment(AudioPlayerService.self) private var audioPlayer
     @Environment(LibraryManager.self) private var libraryManager
 
+    @State private var loadedAlbum: Album?
     @State private var tracks: [Track] = []
     @State private var isLoading = true
+
+    private var displayAlbum: Album { loadedAlbum ?? album }
 
     var body: some View {
         ZStack {
@@ -34,7 +37,7 @@ struct AlbumDetailView: View {
 
     private var albumHeader: some View {
         VStack(spacing: 16) {
-            AsyncImage(url: MonochromeAPI().getImageUrl(id: album.cover, size: 640)) { phase in
+            AsyncImage(url: MonochromeAPI().getImageUrl(id: displayAlbum.cover, size: 640)) { phase in
                 if let image = phase.image {
                     image.resizable().aspectRatio(contentMode: .fit)
                 } else {
@@ -47,13 +50,13 @@ struct AlbumDetailView: View {
             .shadow(color: .black.opacity(0.4), radius: 20, y: 10)
 
             VStack(spacing: 6) {
-                Text(album.title)
+                Text(displayAlbum.title)
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(Theme.foreground)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
 
-                if let artist = album.artist {
+                if let artist = displayAlbum.artist {
                     Button(action: { navigationPath.append(artist) }) {
                         Text(artist.name)
                             .font(.system(size: 15))
@@ -63,14 +66,14 @@ struct AlbumDetailView: View {
                 }
 
                 HStack(spacing: 6) {
-                    if let year = album.releaseYear {
+                    if let year = displayAlbum.releaseYear {
                         Text(year)
                     }
-                    if let type = album.type, type.uppercased() != "ALBUM" {
+                    if let type = displayAlbum.type, type.uppercased() != "ALBUM" {
                         Text("·")
                         Text(type)
                     }
-                    if let count = album.numberOfTracks {
+                    if let count = displayAlbum.numberOfTracks {
                         Text("·")
                         Text("\(count) tracks")
                     }
@@ -133,6 +136,7 @@ struct AlbumDetailView: View {
     private func loadAlbum() async {
         do {
             let detail = try await MonochromeAPI().fetchAlbum(id: album.id)
+            loadedAlbum = detail.album
             tracks = detail.tracks
         } catch {
             print("Error loading album: \(error)")
