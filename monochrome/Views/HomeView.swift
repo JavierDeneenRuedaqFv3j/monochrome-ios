@@ -5,10 +5,7 @@ struct HomeView: View {
     @Environment(AudioPlayerService.self) private var audioPlayer
     @Environment(LibraryManager.self) private var libraryManager
 
-    @State private var searchResults: [Track] = []
-    @State private var isSearching = false
-    @State private var hasSearched = false
-    @State private var lastQuery = ""
+    @State private var showSearch = false
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -21,57 +18,46 @@ struct HomeView: View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                 Section {
-                    if hasSearched {
-                        searchContent
-                    } else {
-                        homeContent
-                    }
+                    homeContent
                 } header: {
-                    SearchBar(
-                        onSearch: { query in
-                            lastQuery = query
-                            performSearch(query)
-                        },
-                        onClear: {
-                            searchResults = []
-                            hasSearched = false
-                            lastQuery = ""
-                        }
-                    )
-                    .background(.clear)
+                    searchBarButton
+                        .background(Theme.background)
                 }
             }
         }
         .background(Theme.background)
+        .fullScreenCover(isPresented: $showSearch) {
+            NavigationStack {
+                SearchView(navigationPath: $navigationPath)
+            }
+        }
     }
 
-    // MARK: - Search Content
-
-    @ViewBuilder
-    private var searchContent: some View {
-        if isSearching {
-            ProgressView().tint(Theme.mutedForeground)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 80)
-        } else if !searchResults.isEmpty {
-            ForEach(Array(searchResults.enumerated()), id: \.element.id) { index, track in
-                let queue = Array(searchResults.dropFirst(index + 1))
-                let previous = Array(searchResults.prefix(index))
-                TrackRow(track: track, queue: queue, previousTracks: previous, showCover: true, navigationPath: $navigationPath)
-            }
-            Color.clear.frame(height: 120)
-        } else {
-            VStack(spacing: 10) {
-                Text("No results for")
+    // MARK: - Search Bar Button
+    
+    // A fake search bar that acts as a button to launch the real search screen
+    private var searchBarButton: some View {
+        Button(action: { showSearch = true }) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
                     .font(.system(size: 16))
                     .foregroundColor(Theme.mutedForeground)
-                Text("\"\(lastQuery)\"")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(Theme.foreground)
+
+                Text("What do you want to listen to?")
+                    .font(.system(size: 16))
+                    .foregroundColor(Theme.mutedForeground)
+
+                Spacer()
             }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 80)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Home Content
@@ -118,7 +104,6 @@ struct HomeView: View {
                 .foregroundColor(Theme.foreground)
                 .padding(.horizontal, 16)
 
-            // Compact grid (2 columns, Spotify style)
             let recentTracks = recentTracksList
             LazyVGrid(columns: [
                 GridItem(.flexible(), spacing: 8),
@@ -136,11 +121,9 @@ struct HomeView: View {
 
     private var recentTracksList: [Track] {
         var tracks: [Track] = []
-        // Current track first
         if let current = audioPlayer.currentTrack {
             tracks.append(current)
         }
-        // Then history (most recent first), deduplicated
         for track in audioPlayer.playHistory.reversed() {
             if !tracks.contains(where: { $0.id == track.id }) {
                 tracks.append(track)
@@ -174,57 +157,6 @@ struct HomeView: View {
                 }
             }
         }
-    }
-
-    // MARK: - Search
-
-    private func performSearch(_ query: String) {
-        guard !query.isEmpty else { return }
-        isSearching = true
-        hasSearched = true
-
-        Task {
-            do { searchResults = try await MonochromeAPI().searchTracks(query: query) }
-            catch { print("Search error: \(error)") }
-            isSearching = false
-        }
-    }
-}
-
-// MARK: - Search Bar (isolated to prevent re-renders)
-
-private struct SearchBar: View {
-    let onSearch: (String) -> Void
-    let onClear: () -> Void
-    @State private var text = ""
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 16))
-                .foregroundColor(Theme.mutedForeground)
-
-            TextField("What do you want to listen to?", text: $text)
-                .font(.system(size: 16))
-                .foregroundColor(Theme.foreground)
-                .autocorrectionDisabled()
-                .onSubmit { onSearch(text) }
-
-            if !text.isEmpty {
-                Button(action: { text = ""; onClear() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(Theme.mutedForeground)
-                }
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 6)
     }
 }
 

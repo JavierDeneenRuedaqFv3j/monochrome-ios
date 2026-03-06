@@ -3,37 +3,49 @@ import SwiftUI
 struct SearchView: View {
     @Binding var navigationPath: NavigationPath
     @Environment(AudioPlayerService.self) private var audioPlayer
+    @Environment(\.dismiss) private var dismiss
+
     @State private var searchText = ""
     @State private var searchResults: [Track] = []
     @State private var isSearching = false
     @State private var hasSearched = false
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             // Search bar
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16))
-                    .foregroundColor(Theme.mutedForeground)
+            HStack(spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16))
+                        .foregroundColor(Theme.mutedForeground)
 
-                TextField("What do you want to listen to?", text: $searchText)
-                    .font(.system(size: 16))
-                    .foregroundColor(Theme.foreground)
-                    .autocorrectionDisabled()
-                    .onSubmit { performSearch() }
+                    TextField("What do you want to listen to?", text: $searchText)
+                        .focused($isFocused)
+                        .font(.system(size: 16))
+                        .foregroundColor(Theme.foreground)
+                        .autocorrectionDisabled()
+                        .onSubmit { performSearch() }
 
-                if !searchText.isEmpty {
-                    Button(action: { searchText = ""; searchResults = []; hasSearched = false }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(Theme.mutedForeground)
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = ""; searchResults = []; hasSearched = false }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(Theme.mutedForeground)
+                        }
                     }
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Theme.secondary)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                Button("Cancel") {
+                    dismiss()
+                }
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(Theme.foreground)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(Theme.secondary)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 8)
@@ -75,6 +87,12 @@ struct SearchView: View {
             }
         }
         .background(Theme.background)
+        .onAppear {
+            // Auto-focus the search bar when the view appears as a fullScreenCover
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isFocused = true
+            }
+        }
     }
 
     private func performSearch() {
