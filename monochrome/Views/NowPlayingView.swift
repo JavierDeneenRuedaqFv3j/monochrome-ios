@@ -316,6 +316,13 @@ struct NowPlayingView: View {
 
             Spacer()
 
+            Button(action: { audioPlayer.cycleRepeatMode() }) {
+                Image(systemName: audioPlayer.repeatMode == .one ? "repeat.1" : "repeat")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(.white.opacity(audioPlayer.repeatMode != .off ? 1.0 : 0.4))
+            }
+            .frame(width: 44, height: 44)
+
             Button(action: { showQueue = true }) {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 17, weight: .medium))

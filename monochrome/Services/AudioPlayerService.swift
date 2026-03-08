@@ -5,6 +5,12 @@ import Observation
 import UIKit
 import SwiftUI
 
+enum RepeatMode: Int, Codable {
+    case off = 0
+    case all = 1
+    case one = 2
+}
+
 @Observable
 class AudioPlayerService {
     var player: AVQueuePlayer?
@@ -27,6 +33,7 @@ class AudioPlayerService {
     var isShuffled: Bool = false
     private var originalQueue: [Track] = []
     var queueSessionHistoryStart: Int = 0
+    var repeatMode: RepeatMode = .off
 
     private let restartThreshold: TimeInterval = 3
 
@@ -47,6 +54,7 @@ class AudioPlayerService {
     private let shuffleKey = "monochrome_is_shuffled"
     private let originalQueueKey = "monochrome_original_queue"
     private let queueSessionHistoryStartKey = "monochrome_queue_session_history_start"
+    private let repeatModeKey = "monochrome_repeat_mode"
     private var restoredTimestamp: TimeInterval = 0
 
     init() {
@@ -74,6 +82,17 @@ class AudioPlayerService {
             queuedTracks.shuffle()
             isShuffled = true
         }
+        updateRemoteCommandState()
+        saveState()
+    }
+
+    func cycleRepeatMode() {
+        switch repeatMode {
+        case .off: repeatMode = .all
+        case .all: repeatMode = .one
+        case .one: repeatMode = .off
+        }
+        updateRemoteCommandState()
         saveState()
     }
 
@@ -83,6 +102,7 @@ class AudioPlayerService {
         if isShuffled {
             originalQueue.removeAll { $0.id == removed.id }
         }
+        updateRemoteCommandState()
         saveState()
     }
 
@@ -99,6 +119,7 @@ class AudioPlayerService {
         if isShuffled {
             originalQueue.insert(track, at: 0)
         }
+        updateRemoteCommandState()
         saveState()
     }
 
@@ -107,6 +128,7 @@ class AudioPlayerService {
         if isShuffled {
             originalQueue.append(track)
         }
+        updateRemoteCommandState()
         saveState()
     }
 
@@ -312,9 +334,56 @@ class AudioPlayerService {
             self.seek(to: positionEvent.positionTime)
             return .success
         }
+
+    }
+
+    private func updateRemoteCommandState() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        commandCenter.nextTrackCommand.isEnabled = hasNextTrack || repeatMode != .off
+        commandCenter.previousTrackCommand.isEnabled = hasPreviousTrack
     }
 
     func nextTrack() {
+        // Repeat one: replay the current track
+        if repeatMode == .one, let current = currentTrack {
+            seek(to: 0)
+            if !isPlaying {
+                player?.play()
+                isPlaying = true
+                updateNowPlayingInfo()
+            }
+            return
+        }
+
+        // Repeat all: if queue is empty, rebuild it from session history
+        if repeatMode == .all && queuedTracks.isEmpty {
+            var allTracks: [Track] = []
+            allTracks.append(contentsOf: previousInSession)
+            if let current = currentTrack {
+                allTracks.append(current)
+            }
+            guard !allTracks.isEmpty else {
+                player?.pause()
+                isPlaying = false
+                updateNowPlayingInfo()
+                saveState()
+                return
+            }
+            let first = allTracks.removeFirst()
+            queuedTracks = allTracks
+            if isShuffled {
+                queuedTracks.shuffle()
+                originalQueue = queuedTracks
+            }
+
+            let wasShuffled = isShuffled
+            let savedOriginal = originalQueue
+            play(track: first, queue: queuedTracks)
+            isShuffled = wasShuffled
+            originalQueue = savedOriginal
+            return
+        }
+
         guard !queuedTracks.isEmpty else {
             player?.pause()
             isPlaying = false
@@ -451,6 +520,7 @@ class AudioPlayerService {
         }
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+        updateRemoteCommandState()
     }
 
     // MARK: - Persistence
@@ -483,6 +553,7 @@ class AudioPlayerService {
         } else {
             UserDefaults.standard.removeObject(forKey: originalQueueKey)
         }
+        UserDefaults.standard.set(repeatMode.rawValue, forKey: repeatModeKey)
     }
 
     private func restoreState() {
@@ -507,6 +578,7 @@ class AudioPlayerService {
            let tracks = try? JSONDecoder().decode([Track].self, from: data) {
             self.originalQueue = tracks
         }
+        self.repeatMode = RepeatMode(rawValue: UserDefaults.standard.integer(forKey: repeatModeKey)) ?? .off
 
         // Restore current track (paused state, not auto-playing)
         if let data = UserDefaults.standard.data(forKey: currentTrackKey),
@@ -529,6 +601,7 @@ class AudioPlayerService {
                 self.duration = savedDuration
             }
         }
+        updateRemoteCommandState()
     }
 
     deinit {
