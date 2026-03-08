@@ -9,7 +9,6 @@ struct ArtistDetailView: View {
     @State private var artistDetail: ArtistDetail?
     @State private var bio: String?
     @State private var similarArtists: [Artist] = []
-    @State private var isLoading = true
     @State private var showAllTracks = false
     @State private var showFullBio = false
     @State private var discoFilter: DiscoFilter = .all
@@ -24,17 +23,13 @@ struct ArtistDetailView: View {
         ZStack {
             Theme.background.ignoresSafeArea()
 
-            if isLoading {
-                ProgressView().tint(Theme.mutedForeground)
-            } else {
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 0) {
-                        heroHeader
-                        contentSection
-                    }
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    heroHeader
+                    contentSection
                 }
-                .ignoresSafeArea(edges: .top)
             }
+            .ignoresSafeArea(edges: .top)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -107,6 +102,11 @@ struct ArtistDetailView: View {
             // Popular tracks
             if let detail = artistDetail, !detail.topTracks.isEmpty {
                 popularTracks(detail.topTracks)
+            } else if artistDetail == nil {
+                // Still loading
+                ProgressView().tint(Theme.mutedForeground)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 16)
             }
 
             // Discography
@@ -182,7 +182,7 @@ struct ArtistDetailView: View {
                 let previous = Array(tracks.prefix(index))
                 TrackRow(
                     track: track, queue: queue, previousTracks: previous,
-                    showCover: true, showIndex: index + 1,
+                    showCover: true, showIndex: nil,
                     navigationPath: $navigationPath
                 )
             }
@@ -415,14 +415,34 @@ struct ArtistDetailView: View {
     // MARK: - Data Loading
 
     private func loadAllData() async {
-        async let artistTask = MonochromeAPI().fetchArtist(id: artist.id)
-        async let bioTask = MonochromeAPI().fetchArtistBio(id: artist.id)
-        async let similarTask = MonochromeAPI().fetchSimilarArtists(id: artist.id)
+        // Load each section independently for progressive rendering
+        async let artistTask: () = loadArtistDetail()
+        async let bioTask: () = loadBio()
+        async let similarTask: () = loadSimilar()
+        _ = await (artistTask, bioTask, similarTask)
+    }
 
-        do { artistDetail = try await artistTask } catch { print("Error loading artist: \(error)") }
-        bio = await bioTask
-        similarArtists = await similarTask
-        isLoading = false
+    private func loadArtistDetail() async {
+        do {
+            let detail = try await MonochromeAPI().fetchArtist(id: artist.id)
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.3)) { artistDetail = detail }
+            }
+        } catch { print("Error loading artist: \(error)") }
+    }
+
+    private func loadBio() async {
+        let result = await MonochromeAPI().fetchArtistBio(id: artist.id)
+        await MainActor.run {
+            withAnimation(.easeOut(duration: 0.3)) { bio = result }
+        }
+    }
+
+    private func loadSimilar() async {
+        let result = await MonochromeAPI().fetchSimilarArtists(id: artist.id)
+        await MainActor.run {
+            withAnimation(.easeOut(duration: 0.3)) { similarArtists = result }
+        }
     }
 
     // MARK: - Helpers
