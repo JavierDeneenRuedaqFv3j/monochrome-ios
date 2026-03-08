@@ -114,37 +114,96 @@ class MonochromeAPI {
 
             // Tracks: top-level "tracks" array
             if let tracksArray = contentJson?["tracks"] as? [[String: Any]] {
-                // Inject artist info into each track (API doesn't embed it)
+                // Inject/fix artist info into each track
                 var artistDict: [String: Any] = ["id": id, "name": name]
                 if let pic = picture { artistDict["picture"] = pic }
                 let enriched = tracksArray.map { track -> [String: Any] in
                     var t = track
+                    // Always ensure a proper "artist" dict is set with correct picture
                     if (t["artist"] as? [String: Any]) == nil {
                         t["artist"] = artistDict
                     }
                     return t
                 }
-                if let tracksData = try? JSONSerialization.data(withJSONObject: enriched),
-                   let decoded = try? JSONDecoder().decode([Track].self, from: tracksData) {
+                do {
+                    let tracksData = try JSONSerialization.data(withJSONObject: enriched)
+                    let decoded = try JSONDecoder().decode([Track].self, from: tracksData)
                     topTracks = decoded
                         .sorted { ($0.popularity ?? 0) > ($1.popularity ?? 0) }
                         .prefix(15)
                         .map { $0 }
+                } catch {
+                    print("Error decoding topTracks: \(error)")
                 }
             }
 
             // Albums: "albums" -> "items"
             if let albumsObj = contentJson?["albums"] as? [String: Any],
-               let albumItems = albumsObj["items"] as? [[String: Any]],
-               let albumsData = try? JSONSerialization.data(withJSONObject: albumItems),
-               let decoded = try? JSONDecoder().decode([Album].self, from: albumsData) {
-                let sorted = decoded.sorted { ($0.releaseDate ?? "") > ($1.releaseDate ?? "") }
-                for a in sorted {
-                    let t = a.type?.uppercased() ?? ""
-                    if t == "EP" || t == "SINGLE" {
-                        eps.append(a)
-                    } else {
-                        albums.append(a)
+               let albumItems = albumsObj["items"] as? [[String: Any]] {
+                do {
+                    let albumsData = try JSONSerialization.data(withJSONObject: albumItems)
+                    let decoded = try JSONDecoder().decode([Album].self, from: albumsData)
+                    let sorted = decoded.sorted { ($0.releaseDate ?? "") > ($1.releaseDate ?? "") }
+                    for a in sorted {
+                        let t = a.type?.uppercased() ?? ""
+                        if t == "EP" || t == "SINGLE" {
+                            eps.append(a)
+                        } else {
+                            albums.append(a)
+                        }
+                    }
+                } catch {
+                    print("Error decoding albums: \(error)")
+                }
+            }
+        }
+
+        if topTracks.isEmpty && albums.isEmpty && eps.isEmpty {
+            let token = "txNoH4kkV41MfH25"
+            
+            // Fallback: Top Tracks
+            if let tUrl = URL(string: "https://api.tidal.com/v1/artists/\(id)/toptracks?countryCode=FR") {
+                var req = URLRequest(url: tUrl)
+                req.setValue(token, forHTTPHeaderField: "X-Tidal-Token")
+                
+                if let (data, resp) = try? await urlSession.data(for: req),
+                   (resp as? HTTPURLResponse)?.statusCode == 200,
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let items = json["items"] as? [[String: Any]] {
+                    
+                    var artistDict: [String: Any] = ["id": id, "name": name]
+                    if let pic = picture { artistDict["picture"] = pic }
+                    
+                    let enriched = items.map { track -> [String: Any] in
+                        var t = track
+                        if (t["artist"] as? [String: Any]) == nil { t["artist"] = artistDict }
+                        return t
+                    }
+                    if let tracksData = try? JSONSerialization.data(withJSONObject: enriched),
+                       let decoded = try? JSONDecoder().decode([Track].self, from: tracksData) {
+                        topTracks = decoded.sorted { ($0.popularity ?? 0) > ($1.popularity ?? 0) }.prefix(15).map { $0 }
+                    }
+                }
+            }
+            
+            // Fallback: Albums
+            if let aUrl = URL(string: "https://api.tidal.com/v1/artists/\(id)/albums?countryCode=FR") {
+                var req = URLRequest(url: aUrl)
+                req.setValue(token, forHTTPHeaderField: "X-Tidal-Token")
+                
+                if let (data, resp) = try? await urlSession.data(for: req),
+                   (resp as? HTTPURLResponse)?.statusCode == 200,
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let items = json["items"] as? [[String: Any]] {
+                    
+                    if let albumsData = try? JSONSerialization.data(withJSONObject: items),
+                       let decoded = try? JSONDecoder().decode([Album].self, from: albumsData) {
+                        let sorted = decoded.sorted { ($0.releaseDate ?? "") > ($1.releaseDate ?? "") }
+                        for a in sorted {
+                            let t = a.type?.uppercased() ?? ""
+                            if t == "EP" || t == "SINGLE" { eps.append(a) }
+                            else { albums.append(a) }
+                        }
                     }
                 }
             }
