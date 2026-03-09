@@ -16,22 +16,24 @@ struct AlbumDetailView: View {
         ZStack {
             Theme.background.ignoresSafeArea()
 
-            if isLoading {
-                ProgressView().tint(Theme.mutedForeground)
-            } else {
-                List {
-                    albumHeader
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
+            List {
+                albumHeader
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+
+                if tracks.isEmpty && isLoading {
+                    skeletonTrackList
+                } else {
                     trackList
-                    Spacer(minLength: 120)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
                 }
-                .listStyle(.plain)
-                .environment(\.defaultMinListRowHeight, 0)
+
+                Spacer(minLength: 120)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
             }
+            .listStyle(.plain)
+            .environment(\.defaultMinListRowHeight, 0)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -133,6 +135,36 @@ struct AlbumDetailView: View {
                 showCover: false, showIndex: index + 1,
                 navigationPath: $navigationPath
             )
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+        }
+    }
+
+    // MARK: - Skeleton Track List
+
+    @ViewBuilder
+    private var skeletonTrackList: some View {
+        let count = displayAlbum.numberOfTracks ?? 8
+        let titleWidths: [CGFloat] = [160, 120, 180, 140, 100, 150, 130, 170, 110, 145, 155, 125]
+        let subtitleWidths: [CGFloat] = [90, 110, 70, 100, 80, 95, 85, 105, 75, 115, 88, 98]
+        ForEach(0..<min(count, 12), id: \.self) { index in
+            HStack(spacing: 12) {
+                Text("\(index + 1)")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(Theme.secondary)
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    SkeletonPill(width: titleWidths[index], height: 14)
+                    SkeletonPill(width: subtitleWidths[index], height: 12)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .shimmer()
             .listRowSeparator(.hidden)
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)

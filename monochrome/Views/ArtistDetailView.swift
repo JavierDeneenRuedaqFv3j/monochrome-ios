@@ -111,12 +111,7 @@ struct ArtistDetailView: View {
         if let detail = artistDetail, !detail.topTracks.isEmpty {
             popularTracks(detail.topTracks)
         } else if isRefreshing {
-            ProgressView().tint(Theme.mutedForeground)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 16)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
+            skeletonTracks
         }
 
         // Discography
@@ -126,6 +121,12 @@ struct ArtistDetailView: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .padding(.top, 24)
+        } else if isRefreshing {
+            skeletonDiscography
+                .padding(.top, 24)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
         }
 
         // About / Bio
@@ -144,6 +145,12 @@ struct ArtistDetailView: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .padding(.top, 24)
+        } else if isRefreshing {
+            skeletonSimilarArtists
+                .padding(.top, 24)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
         }
 
         Spacer(minLength: 120)
@@ -434,6 +441,99 @@ struct ArtistDetailView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    // MARK: - Skeleton Placeholders
+
+    @ViewBuilder
+    private var skeletonTracks: some View {
+        Text("Popular")
+            .font(.system(size: 18, weight: .bold))
+            .foregroundColor(Theme.foreground)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 4)
+            .padding(.top, 24)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+
+        ForEach(0..<5, id: \.self) { i in
+            let titleWidths: [CGFloat] = [160, 120, 180, 140, 100]
+            let subtitleWidths: [CGFloat] = [90, 110, 70, 100, 80]
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Theme.secondary)
+                    .frame(width: 44, height: 44)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    SkeletonPill(width: titleWidths[i], height: 14)
+                    SkeletonPill(width: subtitleWidths[i], height: 12)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .shimmer()
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+        }
+    }
+
+    private var skeletonDiscography: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Discography")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(Theme.foreground)
+                .padding(.horizontal, 16)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(0..<4, id: \.self) { i in
+                        let nameWidths: [CGFloat] = [110, 90, 130, 100]
+                        VStack(alignment: .leading, spacing: 6) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Theme.secondary)
+                                .frame(width: 150, height: 150)
+
+                            SkeletonPill(width: nameWidths[i], height: 13)
+                            SkeletonPill(width: 60, height: 11)
+                        }
+                        .frame(width: 150)
+                        .shimmer()
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    private var skeletonSimilarArtists: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Fans also like")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(Theme.foreground)
+                .padding(.horizontal, 16)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(0..<5, id: \.self) { i in
+                        let nameWidths: [CGFloat] = [70, 90, 55, 80, 65]
+                        VStack(spacing: 8) {
+                            Circle()
+                                .fill(Theme.secondary)
+                                .frame(width: 120, height: 120)
+
+                            SkeletonPill(width: nameWidths[i])
+                        }
+                        .frame(width: 120)
+                        .shimmer()
                     }
                 }
                 .padding(.horizontal, 16)
