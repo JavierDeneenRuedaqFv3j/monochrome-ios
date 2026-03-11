@@ -35,10 +35,11 @@ class AudioPlayerService {
     var queueSessionHistoryStart: Int = 0
     var repeatMode: RepeatMode = .off
 
+    private var savedQueueForRepeatOne: [Track] = []
     private let restartThreshold: TimeInterval = 3
 
     var hasPreviousTrack: Bool { !previousInSession.isEmpty || currentTime >= restartThreshold }
-    var hasNextTrack: Bool { !queuedTracks.isEmpty }
+    var hasNextTrack: Bool { !queuedTracks.isEmpty || repeatMode != .off }
 
     var previousInSession: [Track] {
         guard playHistory.count > queueSessionHistoryStart else { return [] }
@@ -55,6 +56,7 @@ class AudioPlayerService {
     private let originalQueueKey = "monochrome_original_queue"
     private let queueSessionHistoryStartKey = "monochrome_queue_session_history_start"
     private let repeatModeKey = "monochrome_repeat_mode"
+    private let savedQueueRepeatOneKey = "monochrome_saved_queue_repeat_one"
     private var restoredTimestamp: TimeInterval = 0
 
     init() {
@@ -87,11 +89,44 @@ class AudioPlayerService {
     }
 
     func cycleRepeatMode() {
+        let oldMode = repeatMode
         switch repeatMode {
         case .off: repeatMode = .all
         case .all: repeatMode = .one
         case .one: repeatMode = .off
         }
+
+        switch (oldMode, repeatMode) {
+        case (.off, .all):
+            // Build circular queue: append session history + current track
+            var seenIds = Set(queuedTracks.map { $0.id })
+            var toAppend: [Track] = []
+            for track in previousInSession {
+                if seenIds.insert(track.id).inserted {
+                    toAppend.append(track)
+                }
+            }
+            if let current = currentTrack, seenIds.insert(current.id).inserted {
+                toAppend.append(current)
+            }
+            queuedTracks.append(contentsOf: toAppend)
+
+        case (.all, .one):
+            // Strip loop duplicates (session history + current) to recover original queue
+            var loopIds = Set(previousInSession.map { $0.id })
+            if let current = currentTrack { loopIds.insert(current.id) }
+            savedQueueForRepeatOne = queuedTracks.filter { !loopIds.contains($0.id) }
+            queuedTracks = []
+
+        case (.one, .off):
+            // Restore the queue saved before repeat one
+            queuedTracks = savedQueueForRepeatOne
+            savedQueueForRepeatOne = []
+
+        default:
+            break
+        }
+
         updateRemoteCommandState()
         saveState()
     }
@@ -149,6 +184,20 @@ class AudioPlayerService {
         playHistory.append(contentsOf: previousTracks)
 
         self.queuedTracks = queue
+        // Repeat all: build circular queue by appending previous tracks + current track
+        if repeatMode == .all {
+            var seenIds = Set(queue.map { $0.id })
+            var toAppend: [Track] = []
+            for t in previousTracks {
+                if seenIds.insert(t.id).inserted && t.id != track.id {
+                    toAppend.append(t)
+                }
+            }
+            if seenIds.insert(track.id).inserted {
+                toAppend.append(track)
+            }
+            self.queuedTracks.append(contentsOf: toAppend)
+        }
         self.isShuffled = false
         self.originalQueue = []
         self.currentTrack = track
@@ -344,22 +393,28 @@ class AudioPlayerService {
     }
 
     func nextTrack() {
-        // Repeat one: replay the current track
+        // Repeat one: replay the current track from the beginning
         if repeatMode == .one, let current = currentTrack {
-            seek(to: 0)
-            if !isPlaying {
-                player?.play()
-                isPlaying = true
-                updateNowPlayingInfo()
-            }
+            // Re-stream the track (AVPlayerItem is consumed at end)
+            let savedSessionStart = queueSessionHistoryStart
+            let savedHistory = playHistory
+            play(track: current, queue: [])
+            // Restore history/session so previousTrack still works
+            playHistory = savedHistory
+            queueSessionHistoryStart = savedSessionStart
             return
         }
 
         // Repeat all: if queue is empty, rebuild it from session history
         if repeatMode == .all && queuedTracks.isEmpty {
             var allTracks: [Track] = []
-            allTracks.append(contentsOf: previousInSession)
-            if let current = currentTrack {
+            var seenIds = Set<Int>()
+            for track in previousInSession {
+                if seenIds.insert(track.id).inserted {
+                    allTracks.append(track)
+                }
+            }
+            if let current = currentTrack, seenIds.insert(current.id).inserted {
                 allTracks.append(current)
             }
             guard !allTracks.isEmpty else {
@@ -421,6 +476,11 @@ class AudioPlayerService {
         // Put current track back at front of queue
         if let current = currentTrack {
             queuedTracks.insert(current, at: 0)
+            // In repeat all, remove the loop duplicate of current from the end
+            if repeatMode == .all, queuedTracks.count > 1,
+               let lastIdx = queuedTracks.lastIndex(where: { $0.id == current.id }), lastIdx > 0 {
+                queuedTracks.remove(at: lastIdx)
+            }
         }
 
         let previous = playHistory.removeLast()
@@ -554,6 +614,11 @@ class AudioPlayerService {
             UserDefaults.standard.removeObject(forKey: originalQueueKey)
         }
         UserDefaults.standard.set(repeatMode.rawValue, forKey: repeatModeKey)
+        if !savedQueueForRepeatOne.isEmpty, let data = try? JSONEncoder().encode(savedQueueForRepeatOne) {
+            UserDefaults.standard.set(data, forKey: savedQueueRepeatOneKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: savedQueueRepeatOneKey)
+        }
     }
 
     private func restoreState() {
@@ -579,6 +644,10 @@ class AudioPlayerService {
             self.originalQueue = tracks
         }
         self.repeatMode = RepeatMode(rawValue: UserDefaults.standard.integer(forKey: repeatModeKey)) ?? .off
+        if let data = UserDefaults.standard.data(forKey: savedQueueRepeatOneKey),
+           let tracks = try? JSONDecoder().decode([Track].self, from: data) {
+            self.savedQueueForRepeatOne = tracks
+        }
 
         // Restore current track (paused state, not auto-playing)
         if let data = UserDefaults.standard.data(forKey: currentTrackKey),
