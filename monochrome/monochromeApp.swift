@@ -6,6 +6,7 @@ struct MonochromeIOSApp: App {
     @State private var audioPlayerService = AudioPlayerService()
     @State private var libraryManager = LibraryManager.shared
     @State private var authService = AuthService.shared
+    @State private var syncTimer: Timer?
 
     var body: some Scene {
         WindowGroup {
@@ -15,10 +16,33 @@ struct MonochromeIOSApp: App {
                 .environment(authService)
                 .onAppear {
                     setupAudioSession()
+                    triggerSyncIfNeeded()
+                    startPeriodicSync()
+                }
+                .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
+                    if isAuthenticated {
+                        triggerSyncIfNeeded()
+                    } else {
+                        PocketBaseService.shared.clearCache()
+                    }
                 }
         }
     }
-    
+
+    private func triggerSyncIfNeeded() {
+        guard let uid = authService.currentUser?.uid else { return }
+        Task {
+            await libraryManager.syncFromCloud(uid: uid)
+        }
+    }
+
+    private func startPeriodicSync() {
+        syncTimer?.invalidate()
+        syncTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { _ in
+            triggerSyncIfNeeded()
+        }
+    }
+
     private func setupAudioSession() {
 #if os(iOS)
         do {

@@ -175,6 +175,7 @@ class AudioPlayerService {
         // Push current track to history before switching
         if let current = currentTrack {
             playHistory.append(current)
+            syncHistoryInBackground(track: current)
         }
 
         // Mark where the current session starts in playHistory
@@ -671,6 +672,19 @@ class AudioPlayerService {
             }
         }
         updateRemoteCommandState()
+    }
+
+    // MARK: - Cloud History Sync
+
+    private func syncHistoryInBackground(track: Track) {
+        guard let uid = AuthService.shared.currentUser?.uid else { return }
+        Task.detached(priority: .utility) {
+            do {
+                try await PocketBaseService.shared.syncHistoryItem(uid: uid, track: track)
+            } catch {
+                print("[Sync] History sync error: \(error.localizedDescription)")
+            }
+        }
     }
 
     deinit {

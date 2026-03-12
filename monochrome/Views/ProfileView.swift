@@ -7,7 +7,6 @@ struct ProfileView: View {
     @Environment(AuthService.self) private var authService
     @State private var showSettings = false
     @State private var showLogin = false
-    @State private var isSyncing = false
 
     var body: some View {
         ScrollView {
@@ -76,31 +75,6 @@ struct ProfileView: View {
                 // MARK: - Sign In / Sign Out Buttons
                 if authService.isAuthenticated {
                     VStack(spacing: 12) {
-                        // Sync button
-                        Button {
-                            Task { await syncLibrary() }
-                        } label: {
-                            HStack(spacing: 12) {
-                                if isSyncing {
-                                    ProgressView()
-                                        .tint(Theme.foreground)
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Image(systemName: "arrow.triangle.2.circlepath")
-                                        .font(.system(size: 18))
-                                }
-                                Text(isSyncing ? "Syncing..." : "Sync Library")
-                                    .font(.system(size: 16, weight: .semibold))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .foregroundColor(Theme.foreground)
-                            .background(Theme.secondary)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusLg))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isSyncing)
-
                         // Sign out button
                         Button {
                             Task { await authService.signOut() }
@@ -204,43 +178,6 @@ struct ProfileView: View {
         return String(name.prefix(1)).uppercased()
     }
 
-    private func syncLibrary() async {
-        guard let uid = authService.currentUser?.uid else { return }
-        isSyncing = true
-        defer { isSyncing = false }
-
-        do {
-            // Upload local favorites to cloud
-            try await PocketBaseService.shared.syncLibrary(
-                uid: uid,
-                tracks: libraryManager.favoriteTracks,
-                albums: libraryManager.favoriteAlbums
-            )
-
-            // Download cloud data and merge
-            let cloud = try await PocketBaseService.shared.fetchLibrary(uid: uid)
-            let cloudTracks = cloud.decodeTracks()
-            let cloudAlbums = cloud.decodeAlbums()
-
-            // Merge cloud tracks into local
-            for track in cloudTracks {
-                if !libraryManager.isFavorite(trackId: track.id) {
-                    libraryManager.favoriteTracks.append(track)
-                }
-            }
-            libraryManager.saveTracks()
-
-            // Merge cloud albums into local
-            for album in cloudAlbums {
-                if !libraryManager.isFavorite(albumId: album.id) {
-                    libraryManager.favoriteAlbums.append(album)
-                }
-            }
-            libraryManager.saveAlbums()
-        } catch {
-            print("[Sync] Error: \(error.localizedDescription)")
-        }
-    }
 }
 
 // MARK: - Sign In Button
