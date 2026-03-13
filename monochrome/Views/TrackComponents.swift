@@ -155,6 +155,8 @@ struct TrackOptionsSheet: View {
     @Binding var isPresented: Bool
     @Environment(AudioPlayerService.self) private var audioPlayer
     @Environment(LibraryManager.self) private var libraryManager
+    @Environment(PlaylistManager.self) private var playlistManager
+    @State private var showAddToPlaylist = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -201,6 +203,11 @@ struct TrackOptionsSheet: View {
                         libraryManager.toggleFavorite(track: track)
                     }
 
+                    // Add to playlist
+                    OptionRow(icon: "text.badge.plus", label: "Add to playlist") {
+                        showAddToPlaylist = true
+                    }
+
                     // Play next
                     OptionRow(icon: "text.line.first.and.arrowtriangle.forward", label: "Play next") {
                         audioPlayer.playNext(track: track)
@@ -239,6 +246,115 @@ struct TrackOptionsSheet: View {
                     }
                 }
                 .padding(.vertical, 8)
+            }
+        }
+        .sheet(isPresented: $showAddToPlaylist) {
+            AddToPlaylistSheet(track: track, isPresented: $showAddToPlaylist)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.card)
+        }
+    }
+}
+
+struct AddToPlaylistSheet: View {
+    let track: Track
+    @Binding var isPresented: Bool
+    @Environment(PlaylistManager.self) private var playlistManager
+    @State private var showCreateNew = false
+    @State private var newName = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Add to Playlist")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(Theme.foreground)
+                Spacer()
+                Button {
+                    newName = ""
+                    showCreateNew = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(Theme.foreground)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
+
+            Divider().overlay(Theme.border)
+
+            if playlistManager.userPlaylists.isEmpty {
+                VStack(spacing: 12) {
+                    Text("No playlists yet")
+                        .font(.system(size: 15))
+                        .foregroundColor(Theme.mutedForeground)
+                    Button("Create Playlist") {
+                        newName = ""
+                        showCreateNew = true
+                    }
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(Theme.foreground)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(playlistManager.userPlaylists) { playlist in
+                            let alreadyAdded = playlist.tracks.contains { $0.id == track.id }
+                            Button {
+                                if !alreadyAdded {
+                                    playlistManager.addTrack(track, to: playlist.id)
+                                }
+                                isPresented = false
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "music.note.list")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(Theme.mutedForeground)
+                                        .frame(width: 36, height: 36)
+                                        .background(Theme.secondary)
+                                        .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(playlist.name)
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundColor(Theme.foreground)
+                                            .lineLimit(1)
+                                        Text("\(playlist.numberOfTracks) tracks")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(Theme.mutedForeground)
+                                    }
+
+                                    Spacer()
+
+                                    if alreadyAdded {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(Theme.mutedForeground)
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(alreadyAdded)
+                        }
+                    }
+                }
+            }
+        }
+        .alert("New Playlist", isPresented: $showCreateNew) {
+            TextField("Playlist name", text: $newName)
+            Button("Cancel", role: .cancel) {}
+            Button("Create") {
+                let name = newName.trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty else { return }
+                let p = playlistManager.createPlaylist(name: name)
+                playlistManager.addTrack(track, to: p.id)
+                isPresented = false
             }
         }
     }

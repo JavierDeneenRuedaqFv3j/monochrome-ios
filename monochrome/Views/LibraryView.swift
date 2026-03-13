@@ -4,11 +4,16 @@ struct LibraryView: View {
     @Binding var navigationPath: NavigationPath
     @Environment(LibraryManager.self) private var libraryManager
     @Environment(AudioPlayerService.self) private var audioPlayer
+    @Environment(PlaylistManager.self) private var playlistManager
     @State private var selectedFilter: LibraryFilter = .all
     @State private var sortNewest = true
+    @State private var showCreatePlaylist = false
+    @State private var showCreateFolder = false
+    @State private var newItemName = ""
 
     enum LibraryFilter: String, CaseIterable {
         case all = "All"
+        case myPlaylists = "My Playlists"
         case tracks = "Tracks"
         case albums = "Albums"
         case artists = "Artists"
@@ -21,11 +26,13 @@ struct LibraryView: View {
         libraryManager.favoriteAlbums.isEmpty &&
         libraryManager.favoriteArtists.isEmpty &&
         libraryManager.favoritePlaylists.isEmpty &&
-        libraryManager.favoriteMixes.isEmpty
+        libraryManager.favoriteMixes.isEmpty &&
+        playlistManager.userPlaylists.isEmpty
     }
 
     private var availableFilters: [LibraryFilter] {
         var filters: [LibraryFilter] = [.all]
+        if !playlistManager.userPlaylists.isEmpty || !playlistManager.userFolders.isEmpty { filters.append(.myPlaylists) }
         if !libraryManager.favoriteTracks.isEmpty { filters.append(.tracks) }
         if !libraryManager.favoriteAlbums.isEmpty { filters.append(.albums) }
         if !libraryManager.favoriteArtists.isEmpty { filters.append(.artists) }
@@ -47,6 +54,26 @@ struct LibraryView: View {
                 if selectedFilter == .tracks && !libraryManager.favoriteTracks.isEmpty {
                     sortButton
                 }
+
+                Menu {
+                    Button {
+                        newItemName = ""
+                        showCreatePlaylist = true
+                    } label: {
+                        Label("New Playlist", systemImage: "music.note.list")
+                    }
+                    Button {
+                        newItemName = ""
+                        showCreateFolder = true
+                    } label: {
+                        Label("New Folder", systemImage: "folder.badge.plus")
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(Theme.foreground)
+                        .frame(width: 36, height: 36)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
@@ -66,6 +93,25 @@ struct LibraryView: View {
             }
         }
         .background(Theme.background)
+        .alert("New Playlist", isPresented: $showCreatePlaylist) {
+            TextField("Playlist name", text: $newItemName)
+            Button("Cancel", role: .cancel) {}
+            Button("Create") {
+                let name = newItemName.trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty else { return }
+                let p = playlistManager.createPlaylist(name: name)
+                navigationPath.append(p)
+            }
+        }
+        .alert("New Folder", isPresented: $showCreateFolder) {
+            TextField("Folder name", text: $newItemName)
+            Button("Cancel", role: .cancel) {}
+            Button("Create") {
+                let name = newItemName.trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty else { return }
+                playlistManager.createFolder(name: name)
+            }
+        }
     }
 
     // MARK: - Filter Chips
@@ -95,6 +141,7 @@ struct LibraryView: View {
     private var contentView: some View {
         switch selectedFilter {
         case .all: allSectionsView
+        case .myPlaylists: myPlaylistsFullView
         case .tracks: tracksFullView
         case .albums: albumsFullView
         case .artists: artistsFullView
@@ -108,6 +155,9 @@ struct LibraryView: View {
     private var allSectionsView: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
+                if !playlistManager.userPlaylists.isEmpty || !playlistManager.userFolders.isEmpty {
+                    allMyPlaylistsSection
+                }
                 if !libraryManager.favoriteTracks.isEmpty {
                     allTracksSection
                 }
@@ -245,7 +295,60 @@ struct LibraryView: View {
         }
     }
 
+    // MARK: - All: My Playlists Section
+
+    private var allMyPlaylistsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(title: "My Playlists", count: playlistManager.userPlaylists.count) {
+                selectedFilter = .myPlaylists
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    // Folders first
+                    ForEach(playlistManager.userFolders) { folder in
+                        Button {
+                            // Expand folder in full view
+                            selectedFilter = .myPlaylists
+                        } label: {
+                            UserFolderCard(folder: folder, playlistManager: playlistManager)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    // Unfoldered playlists
+                    ForEach(playlistManager.unfolderedPlaylists()) { playlist in
+                        Button(action: { navigationPath.append(playlist) }) {
+                            UserPlaylistCard(playlist: playlist)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
     // MARK: - Full Views (when filter selected)
+
+    private var myPlaylistsFullView: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                // Folders
+                ForEach(playlistManager.userFolders) { folder in
+                    FolderRow(folder: folder, playlistManager: playlistManager, navigationPath: $navigationPath)
+                }
+
+                // Unfoldered playlists
+                ForEach(playlistManager.unfolderedPlaylists()) { playlist in
+                    Button(action: { navigationPath.append(playlist) }) {
+                        UserPlaylistRow(playlist: playlist)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer(minLength: 120)
+            }
+        }
+    }
 
     private var sortedTracks: [Track] {
         if sortNewest { return libraryManager.favoriteTracks }
@@ -649,8 +752,237 @@ private struct MixCard: View {
     }
 }
 
+// MARK: - User Playlist Components
+
+private struct UserPlaylistCard: View {
+    let playlist: UserPlaylist
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            userPlaylistCover(playlist)
+                .frame(width: 150, height: 150)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+            Text(playlist.name)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(Theme.foreground)
+                .lineLimit(1)
+
+            HStack(spacing: 4) {
+                Image(systemName: playlist.isPublic ? "globe" : "lock.fill")
+                    .font(.system(size: 9))
+                Text("\(playlist.numberOfTracks) tracks")
+            }
+            .font(.system(size: 11))
+            .foregroundColor(Theme.mutedForeground)
+        }
+        .frame(width: 150)
+    }
+}
+
+private struct UserPlaylistRow: View {
+    let playlist: UserPlaylist
+
+    var body: some View {
+        HStack(spacing: 12) {
+            userPlaylistCover(playlist)
+                .frame(width: 52, height: 52)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(playlist.name)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(Theme.foreground)
+                    .lineLimit(1)
+
+                HStack(spacing: 4) {
+                    Image(systemName: playlist.isPublic ? "globe" : "lock.fill")
+                        .font(.system(size: 10))
+                    Text("\(playlist.numberOfTracks) tracks")
+                }
+                .font(.system(size: 13))
+                .foregroundColor(Theme.mutedForeground)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct UserFolderCard: View {
+    let folder: UserFolder
+    let playlistManager: PlaylistManager
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RoundedRectangle(cornerRadius: 4).fill(Theme.card)
+                .overlay(
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 36))
+                        .foregroundColor(Theme.mutedForeground.opacity(0.3))
+                )
+                .frame(width: 150, height: 150)
+
+            Text(folder.name)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(Theme.foreground)
+                .lineLimit(1)
+
+            Text("\(folder.playlists.count) playlist\(folder.playlists.count == 1 ? "" : "s")")
+                .font(.system(size: 11))
+                .foregroundColor(Theme.mutedForeground)
+        }
+        .frame(width: 150)
+    }
+}
+
+private struct FolderRow: View {
+    let folder: UserFolder
+    let playlistManager: PlaylistManager
+    @Binding var navigationPath: NavigationPath
+    @State private var isExpanded = false
+    @State private var showRename = false
+    @State private var showDelete = false
+    @State private var renameText = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(Theme.mutedForeground)
+                        .frame(width: 52, height: 52)
+                        .background(Theme.secondary)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(folder.name)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(Theme.foreground)
+                            .lineLimit(1)
+                        Text("\(folder.playlists.count) playlist\(folder.playlists.count == 1 ? "" : "s")")
+                            .font(.system(size: 13))
+                            .foregroundColor(Theme.mutedForeground)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Theme.mutedForeground)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                Button { renameText = folder.name; showRename = true } label: {
+                    Label("Rename", systemImage: "pencil")
+                }
+                Button(role: .destructive) { showDelete = true } label: {
+                    Label("Delete Folder", systemImage: "trash")
+                }
+            }
+
+            if isExpanded {
+                let playlists = playlistManager.playlistsInFolder(folder.id)
+                ForEach(playlists) { playlist in
+                    Button(action: { navigationPath.append(playlist) }) {
+                        UserPlaylistRow(playlist: playlist)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 20)
+                }
+            }
+        }
+        .alert("Rename Folder", isPresented: $showRename) {
+            TextField("Name", text: $renameText)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                let name = renameText.trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty { playlistManager.renameFolder(id: folder.id, name: name) }
+            }
+        }
+        .alert("Delete Folder?", isPresented: $showDelete) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                playlistManager.deleteFolder(id: folder.id)
+            }
+        } message: {
+            Text("Playlists inside won't be deleted.")
+        }
+    }
+}
+
+// Shared cover helper for user playlists
+@ViewBuilder
+private func userPlaylistCover(_ playlist: UserPlaylist) -> some View {
+    if !playlist.cover.isEmpty {
+        AsyncImage(url: MonochromeAPI().getImageUrl(id: playlist.cover)) { phase in
+            if let image = phase.image {
+                image.resizable().scaledToFill()
+            } else {
+                playlistCoverPlaceholder
+            }
+        }
+    } else if playlist.images.count >= 4 {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                coverTile(playlist.images[0])
+                coverTile(playlist.images[1])
+            }
+            HStack(spacing: 0) {
+                coverTile(playlist.images[2])
+                coverTile(playlist.images[3])
+            }
+        }
+    } else if let first = playlist.images.first {
+        AsyncImage(url: MonochromeAPI().getImageUrl(id: first)) { phase in
+            if let image = phase.image {
+                image.resizable().scaledToFill()
+            } else {
+                playlistCoverPlaceholder
+            }
+        }
+    } else {
+        playlistCoverPlaceholder
+    }
+}
+
+@ViewBuilder
+private func coverTile(_ imageId: String) -> some View {
+    AsyncImage(url: MonochromeAPI().getImageUrl(id: imageId)) { phase in
+        if let image = phase.image {
+            image.resizable().scaledToFill()
+        } else {
+            Rectangle().fill(Theme.secondary)
+        }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .clipped()
+}
+
+private var playlistCoverPlaceholder: some View {
+    RoundedRectangle(cornerRadius: 4).fill(Theme.card)
+        .overlay(
+            Image(systemName: "music.note.list")
+                .font(.system(size: 28))
+                .foregroundColor(Theme.mutedForeground.opacity(0.2))
+        )
+}
+
 #Preview {
     LibraryView(navigationPath: .constant(NavigationPath()))
         .environment(LibraryManager.shared)
         .environment(AudioPlayerService())
+        .environment(PlaylistManager.shared)
 }

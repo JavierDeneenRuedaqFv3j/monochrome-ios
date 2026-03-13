@@ -6,6 +6,7 @@ struct MonochromeIOSApp: App {
     @State private var audioPlayerService = AudioPlayerService()
     @State private var libraryManager = LibraryManager.shared
     @State private var authService = AuthService.shared
+    @State private var playlistManager = PlaylistManager.shared
     @State private var syncTimer: Timer?
 
     var body: some Scene {
@@ -14,6 +15,7 @@ struct MonochromeIOSApp: App {
                 .environment(audioPlayerService)
                 .environment(libraryManager)
                 .environment(authService)
+                .environment(playlistManager)
                 .onAppear {
                     setupAudioSession()
                     triggerSyncIfNeeded()
@@ -33,6 +35,7 @@ struct MonochromeIOSApp: App {
         guard let uid = authService.currentUser?.uid else { return }
         Task {
             await libraryManager.syncFromCloud(uid: uid)
+            await playlistManager.syncFromCloud(uid: uid)
         }
     }
 

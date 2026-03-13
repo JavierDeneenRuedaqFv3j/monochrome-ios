@@ -74,6 +74,58 @@ struct Mix: Identifiable, Codable, Hashable {
     static func == (lhs: Mix, rhs: Mix) -> Bool { lhs.id == rhs.id }
 }
 
+// MARK: - User Playlists & Folders
+
+struct UserPlaylist: Identifiable, Codable, Hashable {
+    let id: String
+    var name: String
+    var tracks: [Track]
+    var cover: String
+    var description: String
+    var createdAt: Double
+    var updatedAt: Double
+    var numberOfTracks: Int
+    var images: [String]
+    var isPublic: Bool
+
+    init(id: String = UUID().uuidString, name: String, tracks: [Track] = [], cover: String = "", description: String = "", createdAt: Double = Date().timeIntervalSince1970 * 1000, updatedAt: Double = Date().timeIntervalSince1970 * 1000, numberOfTracks: Int = 0, images: [String] = [], isPublic: Bool = false) {
+        self.id = id
+        self.name = name
+        self.tracks = tracks
+        self.cover = cover
+        self.description = description
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.numberOfTracks = numberOfTracks
+        self.images = images
+        self.isPublic = isPublic
+    }
+
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    static func == (lhs: UserPlaylist, rhs: UserPlaylist) -> Bool { lhs.id == rhs.id }
+}
+
+struct UserFolder: Identifiable, Codable, Hashable {
+    let id: String
+    var name: String
+    var cover: String
+    var playlists: [String] // playlist IDs
+    var createdAt: Double
+    var updatedAt: Double
+
+    init(id: String = UUID().uuidString, name: String, cover: String = "", playlists: [String] = [], createdAt: Double = Date().timeIntervalSince1970 * 1000, updatedAt: Double = Date().timeIntervalSince1970 * 1000) {
+        self.id = id
+        self.name = name
+        self.cover = cover
+        self.playlists = playlists
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    static func == (lhs: UserFolder, rhs: UserFolder) -> Bool { lhs.id == rhs.id }
+}
+
 // MARK: - API Responses
 
 struct SearchResponse: Codable {

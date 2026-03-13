@@ -157,6 +157,10 @@ class PocketBaseService {
         return req
     }
 
+    func updateUserField(recordId: String, uid: String, field: String, value: Any) async throws {
+        try await updateField(recordId: recordId, uid: uid, field: field, value: value)
+    }
+
     private func updateField(recordId: String, uid: String, field: String, value: Any) async throws {
         guard let url = URL(string: "\(baseURL)/api/collections/\(collection)/records/\(recordId)?f_id=\(uid)") else {
             throw PBError.badURL
@@ -278,6 +282,12 @@ class PocketBaseService {
         if let subTitle = mix.subTitle { data["subTitle"] = subTitle }
         if let mixType = mix.mixType { data["mixType"] = mixType }
         if let cover = mix.cover { data["cover"] = cover }
+        return data
+    }
+
+    func minifyTrackForPlaylist(_ track: Track) -> [String: Any] {
+        var data = minifyTrack(track)
+        data["addedAt"] = Int(Date().timeIntervalSince1970 * 1000)
         return data
     }
 

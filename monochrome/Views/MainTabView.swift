@@ -72,6 +72,9 @@ struct MainTabView: View {
                         .navigationDestination(for: Playlist.self) { playlist in
                             PlaylistDetailView(playlist: playlist, navigationPath: $homePath)
                         }
+                        .navigationDestination(for: UserPlaylist.self) { playlist in
+                            UserPlaylistDetailView(playlistId: playlist.id, navigationPath: $homePath)
+                        }
                 }
             }
 
@@ -87,6 +90,9 @@ struct MainTabView: View {
                         }
                         .navigationDestination(for: Playlist.self) { playlist in
                             PlaylistDetailView(playlist: playlist, navigationPath: $searchPath)
+                        }
+                        .navigationDestination(for: UserPlaylist.self) { playlist in
+                            UserPlaylistDetailView(playlistId: playlist.id, navigationPath: $searchPath)
                         }
                 }
                 .ignoresSafeArea(.keyboard)
@@ -105,6 +111,9 @@ struct MainTabView: View {
                         .navigationDestination(for: Playlist.self) { playlist in
                             PlaylistDetailView(playlist: playlist, navigationPath: $libraryPath)
                         }
+                        .navigationDestination(for: UserPlaylist.self) { playlist in
+                            UserPlaylistDetailView(playlistId: playlist.id, navigationPath: $libraryPath)
+                        }
                 }
             }
 
@@ -120,6 +129,9 @@ struct MainTabView: View {
                         }
                         .navigationDestination(for: Playlist.self) { playlist in
                             PlaylistDetailView(playlist: playlist, navigationPath: $profilePath)
+                        }
+                        .navigationDestination(for: UserPlaylist.self) { playlist in
+                            UserPlaylistDetailView(playlistId: playlist.id, navigationPath: $profilePath)
                         }
                 }
             }
@@ -197,6 +209,9 @@ struct MainTabView: View {
                 }
                 .navigationDestination(for: Playlist.self) { playlist in
                     PlaylistDetailView(playlist: playlist, navigationPath: path)
+                }
+                .navigationDestination(for: UserPlaylist.self) { playlist in
+                    UserPlaylistDetailView(playlistId: playlist.id, navigationPath: path)
                 }
         }
     }
