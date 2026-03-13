@@ -69,6 +69,9 @@ struct MainTabView: View {
                         .navigationDestination(for: Album.self) { album in
                             AlbumDetailView(album: album, navigationPath: $homePath)
                         }
+                        .navigationDestination(for: Playlist.self) { playlist in
+                            PlaylistDetailView(playlist: playlist, navigationPath: $homePath)
+                        }
                 }
             }
 
@@ -81,6 +84,9 @@ struct MainTabView: View {
                         }
                         .navigationDestination(for: Album.self) { album in
                             AlbumDetailView(album: album, navigationPath: $searchPath)
+                        }
+                        .navigationDestination(for: Playlist.self) { playlist in
+                            PlaylistDetailView(playlist: playlist, navigationPath: $searchPath)
                         }
                 }
                 .ignoresSafeArea(.keyboard)
@@ -96,6 +102,9 @@ struct MainTabView: View {
                         .navigationDestination(for: Album.self) { album in
                             AlbumDetailView(album: album, navigationPath: $libraryPath)
                         }
+                        .navigationDestination(for: Playlist.self) { playlist in
+                            PlaylistDetailView(playlist: playlist, navigationPath: $libraryPath)
+                        }
                 }
             }
 
@@ -108,6 +117,9 @@ struct MainTabView: View {
                         }
                         .navigationDestination(for: Album.self) { album in
                             AlbumDetailView(album: album, navigationPath: $profilePath)
+                        }
+                        .navigationDestination(for: Playlist.self) { playlist in
+                            PlaylistDetailView(playlist: playlist, navigationPath: $profilePath)
                         }
                 }
             }
@@ -182,6 +194,9 @@ struct MainTabView: View {
                 }
                 .navigationDestination(for: Album.self) { album in
                     AlbumDetailView(album: album, navigationPath: path)
+                }
+                .navigationDestination(for: Playlist.self) { playlist in
+                    PlaylistDetailView(playlist: playlist, navigationPath: path)
                 }
         }
     }

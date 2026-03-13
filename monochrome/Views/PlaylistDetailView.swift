@@ -1,29 +1,35 @@
 import SwiftUI
 
-struct AlbumDetailView: View {
-    let album: Album
+struct PlaylistDetailView: View {
+    let playlist: Playlist
     @Binding var navigationPath: NavigationPath
     @Environment(AudioPlayerService.self) private var audioPlayer
     @Environment(LibraryManager.self) private var libraryManager
 
-    @State private var loadedAlbum: Album?
     @State private var tracks: [Track] = []
+    @State private var loadedDetail: PlaylistDetail?
     @State private var isLoading = true
-
-    private var displayAlbum: Album { loadedAlbum ?? album }
 
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
 
             List {
-                albumHeader
+                playlistHeader
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
 
                 if tracks.isEmpty && isLoading {
                     skeletonTrackList
+                } else if tracks.isEmpty {
+                    Text("No tracks available")
+                        .font(.system(size: 14))
+                        .foregroundColor(Theme.mutedForeground)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 24)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                 } else {
                     trackList
                 }
@@ -37,19 +43,24 @@ struct AlbumDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
-        .task { await loadAlbum() }
+        .task { await loadPlaylist() }
     }
 
     // MARK: - Header
 
-    private var albumHeader: some View {
+    private var playlistHeader: some View {
         VStack(spacing: 16) {
-            AsyncImage(url: MonochromeAPI().getImageUrl(id: displayAlbum.cover, size: 640)) { phase in
+            AsyncImage(url: imageURL(size: 640)) { phase in
                 if let image = phase.image {
                     image.resizable().aspectRatio(contentMode: .fit)
                 } else {
                     RoundedRectangle(cornerRadius: 8).fill(Theme.card)
                         .aspectRatio(1, contentMode: .fit)
+                        .overlay(
+                            Image(systemName: "music.note.list")
+                                .font(.system(size: 48))
+                                .foregroundColor(Theme.mutedForeground.opacity(0.2))
+                        )
                 }
             }
             .frame(width: 220, height: 220)
@@ -57,44 +68,31 @@ struct AlbumDetailView: View {
             .shadow(color: .black.opacity(0.4), radius: 20, y: 10)
 
             VStack(spacing: 6) {
-                Text(displayAlbum.title)
+                Text(loadedDetail?.title ?? playlist.title ?? "Playlist")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(Theme.foreground)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
 
-                if let artist = displayAlbum.artist {
-                    Button(action: { navigationPath.append(artist) }) {
-                        Text(artist.name)
-                            .font(.system(size: 15))
-                            .foregroundColor(Theme.mutedForeground)
-                    }
-                    .buttonStyle(.plain)
+                if let desc = loadedDetail?.description, !desc.isEmpty {
+                    Text(desc)
+                        .font(.system(size: 13))
+                        .foregroundColor(Theme.mutedForeground)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
                 }
 
-                HStack(spacing: 6) {
-                    if let year = displayAlbum.releaseYear {
-                        Text(year)
-                    }
-                    if let type = displayAlbum.type, type.uppercased() != "ALBUM" {
-                        Text("·")
-                        Text(type)
-                    }
-                    if let count = displayAlbum.numberOfTracks {
-                        Text("·")
-                        Text("\(count) tracks")
-                    }
-                }
-                .font(.system(size: 13))
-                .foregroundColor(Theme.mutedForeground)
+                Text("\(loadedDetail?.numberOfTracks ?? playlist.numberOfTracks ?? 0) tracks")
+                    .font(.system(size: 13))
+                    .foregroundColor(Theme.mutedForeground)
             }
 
-            // Play / Shuffle / Favorite buttons
+            // Action buttons
             HStack(spacing: 16) {
-                Button(action: { libraryManager.toggleFavorite(album: displayAlbum) }) {
-                    Image(systemName: libraryManager.isFavorite(albumId: displayAlbum.id) ? "heart.fill" : "heart")
+                Button(action: { libraryManager.toggleFavorite(playlist: playlist) }) {
+                    Image(systemName: libraryManager.isFavorite(playlistId: playlist.uuid) ? "heart.fill" : "heart")
                         .font(.system(size: 22))
-                        .foregroundColor(libraryManager.isFavorite(albumId: displayAlbum.id) ? Theme.foreground : Theme.mutedForeground)
+                        .foregroundColor(libraryManager.isFavorite(playlistId: playlist.uuid) ? Theme.foreground : Theme.mutedForeground)
                 }
                 .buttonStyle(.borderless)
 
@@ -141,7 +139,7 @@ struct AlbumDetailView: View {
             let previous = Array(tracks.prefix(index))
             TrackRow(
                 track: track, queue: queue, previousTracks: previous,
-                showCover: false, showIndex: index + 1,
+                showCover: true, showIndex: nil,
                 navigationPath: $navigationPath
             )
             .listRowSeparator(.hidden)
@@ -150,23 +148,22 @@ struct AlbumDetailView: View {
         }
     }
 
-    // MARK: - Skeleton Track List
+    // MARK: - Skeleton
 
     @ViewBuilder
     private var skeletonTrackList: some View {
-        let count = displayAlbum.numberOfTracks ?? 8
+        let count = min(playlist.numberOfTracks ?? 8, 12)
         let titleWidths: [CGFloat] = [160, 120, 180, 140, 100, 150, 130, 170, 110, 145, 155, 125]
         let subtitleWidths: [CGFloat] = [90, 110, 70, 100, 80, 95, 85, 105, 75, 115, 88, 98]
-        ForEach(0..<min(count, 12), id: \.self) { index in
+        ForEach(0..<count, id: \.self) { index in
             HStack(spacing: 12) {
-                Text("\(index + 1)")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(Theme.secondary)
-                    .frame(width: 28)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Theme.secondary)
+                    .frame(width: 44, height: 44)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    SkeletonPill(width: titleWidths[index], height: 14)
-                    SkeletonPill(width: subtitleWidths[index], height: 12)
+                    SkeletonPill(width: titleWidths[index % 12], height: 14)
+                    SkeletonPill(width: subtitleWidths[index % 12], height: 12)
                 }
 
                 Spacer()
@@ -180,32 +177,38 @@ struct AlbumDetailView: View {
         }
     }
 
-    // MARK: - Data (cache-then-network)
+    // MARK: - Data
 
-    private func loadAlbum() async {
-        // Phase 1: instant from cache
-        let cacheKey = "album_\(album.id)"
-        if let cached: AlbumDetail = CacheService.shared.get(forKey: cacheKey) {
-            loadedAlbum = cached.album
+    private func loadPlaylist() async {
+        let cacheKey = "playlist_\(playlist.uuid)"
+        if let cached: PlaylistDetail = CacheService.shared.get(forKey: cacheKey) {
+            loadedDetail = cached
             tracks = cached.tracks
             isLoading = false
         }
 
-        // Phase 2: skip network if cache is valid (within user-configured maxAge) and complete
         if let age = CacheService.shared.age(forKey: cacheKey),
            age < CacheService.shared.maxAge,
            !tracks.isEmpty {
             return
         }
 
-        // Phase 3: refresh from network
         do {
-            let detail = try await MonochromeAPI().fetchAlbum(id: album.id)
-            loadedAlbum = detail.album
+            let detail = try await MonochromeAPI().fetchPlaylist(uuid: playlist.uuid)
+            loadedDetail = detail
             tracks = detail.tracks
         } catch {
-            if loadedAlbum == nil { print("Error loading album: \(error)") }
+            if loadedDetail == nil { print("Error loading playlist: \(error)") }
         }
         isLoading = false
+    }
+
+    // MARK: - Helpers
+
+    private func imageURL(size: Int = 320) -> URL? {
+        let img = loadedDetail?.image ?? playlist.image
+        guard let img, !img.isEmpty else { return nil }
+        if img.hasPrefix("http") { return URL(string: img) }
+        return MonochromeAPI().getImageUrl(id: img, size: size)
     }
 }

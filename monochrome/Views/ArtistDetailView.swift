@@ -160,8 +160,25 @@ struct ArtistDetailView: View {
 
     // MARK: - Action Buttons (Spotify: shuffle + play)
 
+    private var currentArtist: Artist {
+        Artist(
+            id: artistDetail?.id ?? artist.id,
+            name: artistDetail?.name ?? artist.name,
+            picture: artistDetail?.picture ?? artist.picture,
+            popularity: artistDetail?.popularity ?? artist.popularity
+        )
+    }
+
     private var actionButtons: some View {
         HStack(spacing: 16) {
+            // Favorite
+            Button(action: { libraryManager.toggleFavorite(artist: currentArtist) }) {
+                Image(systemName: libraryManager.isFavorite(artistId: artist.id) ? "heart.fill" : "heart")
+                    .font(.system(size: 22))
+                    .foregroundColor(libraryManager.isFavorite(artistId: artist.id) ? Theme.foreground : Theme.mutedForeground)
+            }
+            .buttonStyle(.borderless)
+
             // Shuffle
             Button(action: {
                 guard let tracks = artistDetail?.topTracks, !tracks.isEmpty else { return }
@@ -172,10 +189,11 @@ struct ArtistDetailView: View {
                     .font(.system(size: 22))
                     .foregroundColor(Theme.mutedForeground)
             }
+            .buttonStyle(.borderless)
 
             Spacer()
 
-            // Play button (Spotify green circle -> white circle in monochrome)
+            // Play button
             Button(action: {
                 guard let tracks = artistDetail?.topTracks, let first = tracks.first else { return }
                 audioPlayer.play(track: first, queue: Array(tracks.dropFirst()))
@@ -189,6 +207,7 @@ struct ArtistDetailView: View {
                         .offset(x: 2)
                 }
             }
+            .buttonStyle(.borderless)
         }
         .padding(.horizontal, 16)
     }

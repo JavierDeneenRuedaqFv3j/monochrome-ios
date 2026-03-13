@@ -8,6 +8,7 @@ struct SearchView: View {
     @State private var searchTracks: [Track] = []
     @State private var searchArtists: [Artist] = []
     @State private var searchAlbums: [Album] = []
+    @State private var searchPlaylists: [Playlist] = []
 
     @State private var isSearching = false
     @State private var hasSearched = false
@@ -21,7 +22,7 @@ struct SearchView: View {
     private let maxHistory = 20
 
     private var hasResults: Bool {
-        !searchTracks.isEmpty || !searchArtists.isEmpty || !searchAlbums.isEmpty
+        !searchTracks.isEmpty || !searchArtists.isEmpty || !searchAlbums.isEmpty || !searchPlaylists.isEmpty
     }
 
     private var showSuggestions: Bool {
@@ -33,6 +34,7 @@ struct SearchView: View {
         case artist(Artist)
         case album(Album)
         case track(Track)
+        case playlist(Playlist)
 
         var id: String {
             switch self {
@@ -40,6 +42,7 @@ struct SearchView: View {
             case .artist(let a): return "a_\(a.id)"
             case .album(let a): return "al_\(a.id)"
             case .track(let t): return "t_\(t.id)"
+            case .playlist(let p): return "p_\(p.uuid)"
             }
         }
 
@@ -49,6 +52,7 @@ struct SearchView: View {
             case .artist(let a): return a.name
             case .album(let a): return a.title
             case .track(let t): return t.title
+            case .playlist(let p): return p.title ?? "Playlist"
             }
         }
 
@@ -58,6 +62,7 @@ struct SearchView: View {
             case .artist: return "Artist"
             case .album(let a): return a.artist?.name ?? "Album"
             case .track(let t): return t.artist?.name ?? "Track"
+            case .playlist(let p): return p.user?.name ?? "Playlist"
             }
         }
 
@@ -67,6 +72,7 @@ struct SearchView: View {
             case .artist: return "person.fill"
             case .album: return "square.stack"
             case .track: return "music.note"
+            case .playlist: return "music.note.list"
             }
         }
 
@@ -139,6 +145,33 @@ struct SearchView: View {
                         .listRowBackground(Color.clear)
                     }
                     
+                    // PLAYLISTS SECTION
+                    if !searchPlaylists.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Playlists")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(Theme.foreground)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 10)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                LazyHStack(spacing: 16) {
+                                    ForEach(searchPlaylists) { playlist in
+                                        NavigationLink(value: playlist) {
+                                            PlaylistSearchResultRow(playlist: playlist)
+                                        }
+                                        .simultaneousGesture(TapGesture().onEnded { isFocused = false })
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                            }
+                            .frame(height: 180)
+                        }
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                    }
+
                     // TRACKS SECTION
                     if !searchTracks.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
@@ -309,6 +342,7 @@ struct SearchView: View {
                         searchTracks = []
                         searchArtists = []
                         searchAlbums = []
+                        searchPlaylists = []
                         hasSearched = false
                         autocompleteTask?.cancel()
                         suggestions = []
@@ -347,6 +381,7 @@ struct SearchView: View {
                 searchArtists = r.artists
                 searchAlbums = r.albums
                 searchTracks = r.tracks
+                searchPlaylists = r.playlists
             } catch { print("Search error: \(error)") }
             isSearching = false
         }
@@ -453,6 +488,20 @@ struct SearchView: View {
             }
             .frame(width: 36, height: 36)
             .clipShape(RoundedRectangle(cornerRadius: 4))
+        case .playlist(let playlist):
+            AsyncImage(url: MonochromeAPI().getImageUrl(id: playlist.image, size: 160)) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                } else {
+                    Image(systemName: "music.note.list")
+                        .font(.system(size: 13))
+                        .foregroundColor(Theme.mutedForeground)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Theme.secondary)
+                }
+            }
+            .frame(width: 36, height: 36)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
         default:
             Image(systemName: suggestion.icon)
                 .font(.system(size: 15))
@@ -480,6 +529,9 @@ struct SearchView: View {
         case .track(let track):
             isFocused = false
             audioPlayer.play(track: track, queue: [])
+        case .playlist(let playlist):
+            isFocused = false
+            navigationPath.append(playlist)
         }
     }
 
@@ -513,6 +565,7 @@ struct SearchView: View {
                 results += r.artists.prefix(3).map { .artist($0) }
                 results += r.albums.prefix(2).map { .album($0) }
                 results += r.tracks.prefix(3).map { .track($0) }
+                results += r.playlists.prefix(2).map { .playlist($0) }
 
                 await MainActor.run {
                     withAnimation(.easeOut(duration: 0.15)) {
@@ -576,6 +629,43 @@ struct AlbumSearchResultRow: View {
                     .frame(maxWidth: 120, alignment: .leading)
                 
                 Text(album.artist?.name ?? "")
+                    .font(.system(size: 12))
+                    .foregroundColor(Theme.mutedForeground)
+                    .lineLimit(1)
+                    .frame(maxWidth: 120, alignment: .leading)
+            }
+        }
+    }
+}
+
+struct PlaylistSearchResultRow: View {
+    let playlist: Playlist
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            AsyncImage(url: MonochromeAPI().getImageUrl(id: playlist.image)) { phase in
+                if let image = phase.image {
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    Rectangle()
+                        .fill(Theme.secondary)
+                        .overlay(
+                            Image(systemName: "music.note.list")
+                                .foregroundColor(Theme.mutedForeground)
+                        )
+                }
+            }
+            .frame(width: 120, height: 120)
+            .cornerRadius(6)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(playlist.title ?? "Playlist")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Theme.foreground)
+                    .lineLimit(1)
+                    .frame(maxWidth: 120, alignment: .leading)
+
+                Text(playlist.user?.name ?? "")
                     .font(.system(size: 12))
                     .foregroundColor(Theme.mutedForeground)
                     .lineLimit(1)

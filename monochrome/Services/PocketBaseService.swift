@@ -66,48 +66,56 @@ class PocketBaseService {
 
     // MARK: - Full Sync (on login)
 
-    func fullSync(uid: String) async throws -> (tracks: [Track], albums: [Album], history: [Track]) {
+    func fullSync(uid: String) async throws -> (tracks: [Track], albums: [Album], artists: [Artist], playlists: [Playlist], mixes: [Mix], history: [Track]) {
         let record = try await getUserRecord(uid: uid, forceRefresh: true)
 
         // Cloud is source of truth — just fetch and decode
         let library: [String: Any] = parseJSON(record.library) ?? [:]
         let tracksDict = (library["tracks"] as? [String: Any]) ?? [:]
         let albumsDict = (library["albums"] as? [String: Any]) ?? [:]
+        let artistsDict = (library["artists"] as? [String: Any]) ?? [:]
+        let playlistsDict = (library["playlists"] as? [String: Any]) ?? [:]
+        let mixesDict = (library["mixes"] as? [String: Any]) ?? [:]
 
         let trackDicts = Array(tracksDict.values.compactMap { $0 as? [String: Any] })
-        print("[Sync] Cloud has \(tracksDict.count) tracks, \(albumsDict.count) albums in library")
+        print("[Sync] Cloud has \(tracksDict.count) tracks, \(albumsDict.count) albums, \(artistsDict.count) artists, \(playlistsDict.count) playlists, \(mixesDict.count) mixes")
         let cloudTracks = trackDicts.decodeTracks()
-        print("[Sync] Decoded \(cloudTracks.count)/\(trackDicts.count) tracks successfully")
         let cloudAlbums = Array(albumsDict.values.compactMap { $0 as? [String: Any] }).decodeAlbums()
+        let cloudArtists = Array(artistsDict.values.compactMap { $0 as? [String: Any] }).decodeArtists()
+        let cloudPlaylists = Array(playlistsDict.values.compactMap { $0 as? [String: Any] }).decodePlaylists()
+        let cloudMixes = Array(mixesDict.values.compactMap { $0 as? [String: Any] }).decodeMixes()
 
         let cloudHistory = parseJSONArray(record.history) ?? []
         let historyTracks = cloudHistory.compactMap { $0 as? [String: Any] }.decodeTracks()
 
-        return (cloudTracks, cloudAlbums, historyTracks)
+        return (cloudTracks, cloudAlbums, cloudArtists, cloudPlaylists, cloudMixes, historyTracks)
     }
 
     // MARK: - Sync Single Library Item (on toggle)
 
-    func syncLibraryItem(uid: String, type: String, track: Track? = nil, album: Album? = nil, added: Bool) async throws {
+    func syncLibraryItem(uid: String, type: String, track: Track? = nil, album: Album? = nil, artist: Artist? = nil, playlist: Playlist? = nil, mix: Mix? = nil, added: Bool) async throws {
         let record = try await getUserRecord(uid: uid, forceRefresh: true)
         var library: [String: Any] = parseJSON(record.library) ?? [:]
 
-        let pluralType = "\(type)s"
+        let pluralType = type == "mix" ? "mixes" : "\(type)s"
         var items = (library[pluralType] as? [String: Any]) ?? [:]
 
         let key: String?
         if let track = track { key = String(track.id) }
         else if let album = album { key = String(album.id) }
+        else if let artist = artist { key = String(artist.id) }
+        else if let playlist = playlist { key = playlist.uuid }
+        else if let mix = mix { key = mix.id }
         else { key = nil }
 
         print("[Sync] syncLibraryItem: \(added ? "ADD" : "REMOVE") \(type) key=\(key ?? "nil"), items before: \(items.keys.sorted())")
 
         if added {
-            if let track = track {
-                items[String(track.id)] = minifyTrack(track)
-            } else if let album = album {
-                items[String(album.id)] = minifyAlbum(album)
-            }
+            if let track = track { items[String(track.id)] = minifyTrack(track) }
+            else if let album = album { items[String(album.id)] = minifyAlbum(album) }
+            else if let artist = artist { items[String(artist.id)] = minifyArtist(artist) }
+            else if let playlist = playlist { items[playlist.uuid] = minifyPlaylist(playlist) }
+            else if let mix = mix { items[mix.id] = minifyMix(mix) }
         } else {
             if let key = key {
                 let removed = items.removeValue(forKey: key)
@@ -239,6 +247,40 @@ class PocketBaseService {
         return data
     }
 
+    private func minifyArtist(_ artist: Artist) -> [String: Any] {
+        var data: [String: Any] = [
+            "id": artist.id,
+            "name": artist.name,
+            "addedAt": Int(Date().timeIntervalSince1970 * 1000)
+        ]
+        if let picture = artist.picture { data["picture"] = picture }
+        return data
+    }
+
+    private func minifyPlaylist(_ playlist: Playlist) -> [String: Any] {
+        var data: [String: Any] = [
+            "uuid": playlist.uuid,
+            "addedAt": Int(Date().timeIntervalSince1970 * 1000)
+        ]
+        if let title = playlist.title { data["title"] = title }
+        if let image = playlist.image { data["image"] = image }
+        if let count = playlist.numberOfTracks { data["numberOfTracks"] = count }
+        if let user = playlist.user, let name = user.name { data["user"] = ["name": name] }
+        return data
+    }
+
+    private func minifyMix(_ mix: Mix) -> [String: Any] {
+        var data: [String: Any] = [
+            "id": mix.id,
+            "addedAt": Int(Date().timeIntervalSince1970 * 1000)
+        ]
+        if let title = mix.title { data["title"] = title }
+        if let subTitle = mix.subTitle { data["subTitle"] = subTitle }
+        if let mixType = mix.mixType { data["mixType"] = mixType }
+        if let cover = mix.cover { data["cover"] = cover }
+        return data
+    }
+
     private func minifyHistoryEntry(_ track: Track) -> [String: Any] {
         var data = minifyTrack(track)
         data["timestamp"] = Int(Date().timeIntervalSince1970 * 1000)
@@ -270,6 +312,37 @@ extension Array where Element == [String: Any] {
             guard let data = try? JSONSerialization.data(withJSONObject: dict),
                   let album = try? JSONDecoder().decode(Album.self, from: data) else { return nil }
             return album
+        }
+    }
+
+    func decodeArtists() -> [Artist] {
+        compactMap { raw in
+            var dict = raw
+            if dict["name"] == nil || dict["name"] is NSNull { dict["name"] = "Unknown" }
+            if dict["id"] == nil || dict["id"] is NSNull { return nil }
+            guard let data = try? JSONSerialization.data(withJSONObject: dict),
+                  let artist = try? JSONDecoder().decode(Artist.self, from: data) else { return nil }
+            return artist
+        }
+    }
+
+    func decodePlaylists() -> [Playlist] {
+        compactMap { raw in
+            var dict = raw
+            if dict["uuid"] == nil || dict["uuid"] is NSNull { return nil }
+            guard let data = try? JSONSerialization.data(withJSONObject: dict),
+                  let playlist = try? JSONDecoder().decode(Playlist.self, from: data) else { return nil }
+            return playlist
+        }
+    }
+
+    func decodeMixes() -> [Mix] {
+        compactMap { raw in
+            var dict = raw
+            if dict["id"] == nil || dict["id"] is NSNull { return nil }
+            guard let data = try? JSONSerialization.data(withJSONObject: dict),
+                  let mix = try? JSONDecoder().decode(Mix.self, from: data) else { return nil }
+            return mix
         }
     }
 }

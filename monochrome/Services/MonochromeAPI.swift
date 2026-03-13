@@ -23,15 +23,17 @@ class MonochromeAPI {
         return try JSONDecoder().decode(SearchResponse.self, from: data).data?.items ?? []
     }
 
-    func searchAll(query: String) async throws -> (artists: [Artist], albums: [Album], tracks: [Track]) {
+    func searchAll(query: String) async throws -> (artists: [Artist], albums: [Album], tracks: [Track], playlists: [Playlist]) {
         guard let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let tracksUrl = URL(string: "\(baseURL)/search/?s=\(q)"),
               let artistsUrl = URL(string: "\(baseURL)/search/?a=\(q)"),
-              let albumsUrl = URL(string: "\(baseURL)/search/?al=\(q)") else { throw URLError(.badURL) }
+              let albumsUrl = URL(string: "\(baseURL)/search/?al=\(q)"),
+              let playlistsUrl = URL(string: "\(baseURL)/search/?p=\(q)") else { throw URLError(.badURL) }
 
         async let tracksTask = urlSession.data(for: request(for: tracksUrl))
         async let artistsTask = urlSession.data(for: request(for: artistsUrl))
         async let albumsTask = urlSession.data(for: request(for: albumsUrl))
+        async let playlistsTask = urlSession.data(for: request(for: playlistsUrl))
 
         let (tData, tResp) = try await tracksTask
         var tracks: [Track] = []
@@ -75,7 +77,55 @@ class MonochromeAPI {
             albums = decoded.filter { $0.cover != nil }
         }
 
-        return (artists, albums, tracks)
+        let (pData, pResp) = try await playlistsTask
+        var playlists: [Playlist] = []
+        if (pResp as? HTTPURLResponse)?.statusCode == 200 {
+            playlists = Self.parsePlaylistSearchResults(data: pData)
+        }
+
+        return (artists, albums, tracks, playlists)
+    }
+
+    private static func parsePlaylistSearchResults(data: Data) -> [Playlist] {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
+
+        // Navigate to data.playlists.items
+        let items: [[String: Any]]
+        if let directItems = json["items"] as? [[String: Any]] {
+            items = directItems
+        } else if let dataDict = json["data"] as? [String: Any],
+                  let playlistsDict = dataDict["playlists"] as? [String: Any],
+                  let playlistItems = playlistsDict["items"] as? [[String: Any]] {
+            items = playlistItems
+        } else {
+            return []
+        }
+
+        return items.compactMap { item -> Playlist? in
+            guard let uuid = item["uuid"] as? String else { return nil }
+            let title = item["title"] as? String
+            let image = item["squareImage"] as? String ?? item["image"] as? String
+            let numberOfTracks = item["numberOfTracks"] as? Int
+            let userName = (item["creator"] as? [String: Any])?["name"] as? String
+            return Playlist(
+                uuid: uuid,
+                title: title,
+                image: image,
+                numberOfTracks: numberOfTracks,
+                user: userName != nil ? PlaylistUser(name: userName) : nil
+            )
+        }
+    }
+
+    private static func findItems(in dict: [String: Any]) -> [[String: Any]]? {
+        if let items = dict["items"] as? [[String: Any]] { return items }
+        for value in dict.values {
+            if let nested = value as? [String: Any],
+               let items = findItems(in: nested) {
+                return items
+            }
+        }
+        return nil
     }
 
     // MARK: - Artist (two parallel calls, same as web app)
@@ -330,6 +380,45 @@ class MonochromeAPI {
         return result
     }
 
+    // MARK: - Playlist
+
+    func fetchPlaylist(uuid: String) async throws -> PlaylistDetail {
+        let cacheKey = "playlist_\(uuid)"
+
+        guard let url = URL(string: "\(baseURL)/playlist/?id=\(uuid)") else { throw URLError(.badURL) }
+
+        let (data, response) = try await urlSession.data(for: request(for: url))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let root = json?["data"] as? [String: Any] ?? json ?? [:]
+
+        // Parse playlist metadata
+        let title = root["title"] as? String ?? "Playlist"
+        let image = root["squareImage"] as? String ?? root["image"] as? String
+        let description = root["description"] as? String
+        let numberOfTracks = root["numberOfTracks"] as? Int
+
+        // Parse tracks from "items"
+        var tracks: [Track] = []
+        if let items = root["items"] as? [[String: Any]] {
+            for item in items {
+                let trackObj = item["item"] as? [String: Any] ?? item
+                if let trackData = try? JSONSerialization.data(withJSONObject: trackObj),
+                   let track = try? JSONDecoder().decode(Track.self, from: trackData) {
+                    tracks.append(track)
+                }
+            }
+        }
+
+        let result = PlaylistDetail(
+            uuid: uuid, title: title, image: image, description: description,
+            numberOfTracks: numberOfTracks ?? tracks.count, tracks: tracks
+        )
+        CacheService.shared.set(forKey: cacheKey, value: result)
+        return result
+    }
+
     // MARK: - Stream URL
 
     struct TrackResponse: Codable {
@@ -398,4 +487,13 @@ struct ArtistDetail: Codable {
     let topTracks: [Track]
     let albums: [Album]
     let eps: [Album]
+}
+
+struct PlaylistDetail: Codable {
+    let uuid: String
+    let title: String
+    let image: String?
+    let description: String?
+    let numberOfTracks: Int
+    let tracks: [Track]
 }

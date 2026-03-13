@@ -46,6 +46,34 @@ struct Album: Identifiable, Codable, Hashable {
     static func == (lhs: Album, rhs: Album) -> Bool { lhs.id == rhs.id }
 }
 
+struct Playlist: Identifiable, Codable, Hashable {
+    let uuid: String
+    let title: String?
+    let image: String?
+    let numberOfTracks: Int?
+    let user: PlaylistUser?
+
+    var id: String { uuid }
+
+    func hash(into hasher: inout Hasher) { hasher.combine(uuid) }
+    static func == (lhs: Playlist, rhs: Playlist) -> Bool { lhs.uuid == rhs.uuid }
+}
+
+struct PlaylistUser: Codable, Hashable {
+    let name: String?
+}
+
+struct Mix: Identifiable, Codable, Hashable {
+    let id: String
+    let title: String?
+    let subTitle: String?
+    let mixType: String?
+    let cover: String?
+
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    static func == (lhs: Mix, rhs: Mix) -> Bool { lhs.id == rhs.id }
+}
+
 // MARK: - API Responses
 
 struct SearchResponse: Codable {
