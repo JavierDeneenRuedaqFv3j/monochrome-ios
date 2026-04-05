@@ -230,7 +230,7 @@ struct ArtistDetailView: View {
             if allDownloaded {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundColor(Theme.highlight)
+                    .foregroundColor(Theme.accent)
             } else if someDownloading {
                 ProgressView()
                     .progressViewStyle(.circular)
@@ -305,11 +305,11 @@ struct ArtistDetailView: View {
                     ForEach(DiscoFilter.allCases, id: \.self) { filter in
                         Button(action: { discoFilter = filter }) {
                             Text(filter.rawValue)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(discoFilter == filter ? Theme.primaryForeground : Theme.foreground)
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundColor(discoFilter == filter ? .white : Theme.foreground)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
-                                .background(discoFilter == filter ? Theme.foreground : Theme.secondary)
+                                .background(discoFilter == filter ? Theme.accent : Theme.secondary)
                                 .clipShape(Capsule())
                         }
                     }

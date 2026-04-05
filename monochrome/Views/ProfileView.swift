@@ -654,9 +654,9 @@ struct EditProfileView: View {
 
                 Section("Privacy") {
                     Toggle("Public Playlists", isOn: $playlistsPublic)
-                        .tint(Theme.primary)
+                        .tint(Theme.accent)
                     Toggle("Public Last.fm", isOn: $lastfmPublic)
-                        .tint(Theme.primary)
+                        .tint(Theme.accent)
                 }
             }
             .compatScrollContentBackground(false)
@@ -1053,8 +1053,8 @@ private struct SignInButton: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 52)
-            .foregroundColor(style == .primary ? Theme.primaryForeground : Theme.foreground)
-            .background(style == .primary ? Theme.primary : Theme.secondary)
+            .foregroundColor(style == .primary ? .white : Theme.foreground)
+            .background(style == .primary ? Theme.accent : Theme.secondary)
             .clipShape(RoundedRectangle(cornerRadius: Theme.radiusLg))
         }
         .buttonStyle(.plain)

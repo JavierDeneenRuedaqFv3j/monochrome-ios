@@ -278,7 +278,7 @@ private struct SettingsToggleRow: View {
 
             Toggle("", isOn: $isOn)
                 .labelsHidden()
-                .tint(Theme.highlight)
+                .tint(Theme.accent)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 9)
@@ -396,7 +396,7 @@ struct InstancesSection: View {
 
                     HStack(spacing: 10) {
                         Circle()
-                            .fill(instance.isUser ? Color.blue : Color.green)
+                            .fill(instance.isUser ? Theme.accent : Theme.accent.opacity(0.5))
                             .frame(width: 6, height: 6)
 
                         Text(instance.label)
@@ -439,12 +439,12 @@ struct InstancesSection: View {
                 HStack(spacing: 12) {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 15))
-                        .foregroundColor(Theme.highlight)
+                        .foregroundColor(Theme.accent)
                         .frame(width: 22)
 
                     Text("Add Custom Instance")
                         .font(.system(size: 15))
-                        .foregroundColor(Theme.highlight)
+                        .foregroundColor(Theme.accent)
 
                     Spacer()
                 }

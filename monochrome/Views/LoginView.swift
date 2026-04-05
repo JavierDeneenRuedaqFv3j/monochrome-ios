@@ -19,20 +19,31 @@ struct LoginView: View {
                 Spacer(minLength: 60)
 
                 // Logo
-                VStack(spacing: 12) {
-                    Image(systemName: "waveform.circle.fill")
-                        .font(.system(size: 64))
-                        .foregroundColor(Theme.foreground)
+                VStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(Theme.accent.opacity(0.1))
+                            .frame(width: 100, height: 100)
+                        Image(systemName: "waveform.circle.fill")
+                            .font(.system(size: 56))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Theme.foreground, Theme.accent],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
 
                     Text("Monochrome")
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.foreground)
 
                     Text(modeSubtitle)
                         .font(.system(size: 14))
                         .foregroundColor(Theme.mutedForeground)
                 }
-                .padding(.bottom, 40)
+                .padding(.bottom, 44)
 
                 // Error message
                 if let error = authService.errorMessage {
@@ -151,8 +162,8 @@ struct LoginView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .foregroundColor(Theme.primaryForeground)
-                        .background(isFormValid ? Theme.primary : Theme.primary.opacity(0.4))
+                        .foregroundColor(.white)
+                        .background(isFormValid ? Theme.accent : Theme.accent.opacity(0.4))
                         .clipShape(RoundedRectangle(cornerRadius: Theme.radiusLg))
                     }
                     .buttonStyle(.plain)

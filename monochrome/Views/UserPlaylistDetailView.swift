@@ -297,7 +297,7 @@ struct UserPlaylistDetailView: View {
                 if allDownloaded {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18))
-                        .foregroundColor(Theme.highlight)
+                        .foregroundColor(Theme.accent)
                 } else if someDownloading {
                     ProgressView()
                         .progressViewStyle(.circular)

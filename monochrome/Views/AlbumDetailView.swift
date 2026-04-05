@@ -25,7 +25,7 @@ struct AlbumDetailView: View {
             if allDownloaded {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundColor(Theme.highlight)
+                    .foregroundColor(Theme.accent)
             } else if someDownloading {
                 ProgressView()
                     .progressViewStyle(.circular)
@@ -70,20 +70,46 @@ struct AlbumDetailView: View {
     // MARK: - Header
 
     private var albumHeader: some View {
-        VStack(spacing: 16) {
-            CachedAsyncImage(url: MonochromeAPI().getImageUrl(id: displayAlbum.cover, size: 640)) { phase in
-                if let image = phase.image {
-                    image.resizable().aspectRatio(contentMode: .fit)
-                } else {
-                    RoundedRectangle(cornerRadius: 8).fill(Theme.card)
-                        .aspectRatio(1, contentMode: .fit)
+        VStack(spacing: 18) {
+            // Album art with reflection effect
+            ZStack {
+                CachedAsyncImage(url: MonochromeAPI().getImageUrl(id: displayAlbum.cover, size: 640)) { phase in
+                    if let image = phase.image {
+                        image.resizable().aspectRatio(contentMode: .fit)
+                            .blur(radius: 50)
+                            .opacity(0.3)
+                            .scaleEffect(1.1)
+                            .offset(y: 30)
+                    }
                 }
-            }
-            .frame(width: 220, height: 220)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .shadow(color: .black.opacity(0.4), radius: 20, y: 10)
+                .frame(width: 240, height: 100)
+                .clipped()
+                .mask(
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                )
+                .offset(y: 120)
 
-            VStack(spacing: 6) {
+                CachedAsyncImage(url: MonochromeAPI().getImageUrl(id: displayAlbum.cover, size: 640)) { phase in
+                    if let image = phase.image {
+                        image.resizable().aspectRatio(contentMode: .fit)
+                    } else {
+                        RoundedRectangle(cornerRadius: Theme.radiusMd).fill(
+                            LinearGradient(colors: [Theme.card, Theme.secondary], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                        .aspectRatio(1, contentMode: .fit)
+                        .overlay(
+                            Image(systemName: "music.note")
+                                .font(.system(size: 36))
+                                .foregroundColor(Theme.mutedForeground.opacity(0.3))
+                        )
+                    }
+                }
+                .frame(width: 240, height: 240)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMd))
+                .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
+            }
+
+            VStack(spacing: 8) {
                 Text(displayAlbum.title)
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(Theme.foreground)
@@ -93,35 +119,48 @@ struct AlbumDetailView: View {
                 if let artist = displayAlbum.artist {
                     Button(action: { navigationPath.append(artist) }) {
                         Text(artist.name)
-                            .font(.system(size: 15))
-                            .foregroundColor(Theme.mutedForeground)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(Theme.accent)
                     }
                     .buttonStyle(.plain)
                 }
 
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     if let year = displayAlbum.releaseYear {
                         Text(year)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Theme.secondary)
+                            .clipShape(Capsule())
                     }
                     if let type = displayAlbum.type, type.uppercased() != "ALBUM" {
-                        Text("·")
                         Text(type)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Theme.secondary)
+                            .clipShape(Capsule())
                     }
                     if let count = displayAlbum.numberOfTracks {
-                        Text("·")
                         Text("\(count) tracks")
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Theme.secondary)
+                            .clipShape(Capsule())
                     }
                 }
-                .font(.system(size: 13))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundColor(Theme.mutedForeground)
             }
 
-            // Play / Shuffle / Favorite buttons
-            HStack(spacing: 16) {
+            // Action buttons
+            HStack(spacing: 14) {
                 Button(action: { libraryManager.toggleFavorite(album: displayAlbum) }) {
                     Image(systemName: libraryManager.isFavorite(albumId: displayAlbum.id) ? "heart.fill" : "heart")
-                        .font(.system(size: 22))
-                        .foregroundColor(libraryManager.isFavorite(albumId: displayAlbum.id) ? Theme.foreground : Theme.mutedForeground)
+                        .font(.system(size: 20))
+                        .foregroundColor(libraryManager.isFavorite(albumId: displayAlbum.id) ? Theme.accent : Theme.mutedForeground)
+                        .frame(width: 40, height: 40)
+                        .background(Theme.secondary)
+                        .clipShape(Circle())
                 }
                 .buttonStyle(.borderless)
 
@@ -133,8 +172,11 @@ struct AlbumDetailView: View {
                     audioPlayer.play(track: shuffled[0], queue: Array(shuffled.dropFirst()))
                 }) {
                     Image(systemName: "shuffle")
-                        .font(.system(size: 22))
+                        .font(.system(size: 20))
                         .foregroundColor(Theme.mutedForeground)
+                        .frame(width: 40, height: 40)
+                        .background(Theme.secondary)
+                        .clipShape(Circle())
                 }
                 .buttonStyle(.borderless)
 
@@ -144,21 +186,25 @@ struct AlbumDetailView: View {
                     guard let first = tracks.first else { return }
                     audioPlayer.play(track: first, queue: Array(tracks.dropFirst()))
                 }) {
-                    ZStack {
-                        Circle().fill(Theme.foreground)
-                            .frame(width: 48, height: 48)
+                    HStack(spacing: 6) {
                         Image(systemName: "play.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(Theme.primaryForeground)
-                            .offset(x: 2)
+                            .font(.system(size: 16))
+                            .offset(x: 1)
+                        Text("Play")
+                            .font(.system(size: 15, weight: .semibold))
                     }
+                    .foregroundColor(Theme.primaryForeground)
+                    .padding(.horizontal, 24)
+                    .frame(height: 44)
+                    .background(Theme.foreground)
+                    .clipShape(Capsule())
                 }
                 .buttonStyle(.borderless)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 20)
         }
         .padding(.top, 16)
-        .padding(.bottom, 8)
+        .padding(.bottom, 12)
     }
 
     // MARK: - Track List

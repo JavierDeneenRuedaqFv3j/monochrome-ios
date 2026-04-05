@@ -23,7 +23,7 @@ struct PlaylistDetailView: View {
             if allDownloaded {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundColor(Theme.highlight)
+                    .foregroundColor(Theme.accent)
             } else if someDownloading {
                 ProgressView()
                     .progressViewStyle(.circular)

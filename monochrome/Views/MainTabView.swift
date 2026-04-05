@@ -256,10 +256,11 @@ struct TabBarButton: View {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
+                    .symbolRenderingMode(.hierarchical)
                 Text(label)
                     .font(.system(size: 10, weight: .medium))
             }
-            .foregroundColor(isSelected ? Theme.foreground : Theme.mutedForeground)
+            .foregroundColor(isSelected ? Theme.accent : Theme.mutedForeground)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)

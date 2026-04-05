@@ -48,9 +48,9 @@ struct QueueSheetView: View {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(selectedTab == tab ? .white : .white.opacity(0.35))
-                Rectangle()
-                    .fill(selectedTab == tab ? .white : .clear)
-                    .frame(height: 2)
+                Capsule()
+                    .fill(selectedTab == tab ? Theme.accent : .clear)
+                    .frame(height: 2.5)
             }
         }
         .frame(maxWidth: .infinity)

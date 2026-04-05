@@ -60,23 +60,24 @@ struct LyricsView: View {
 
     private var syncedLyricsContent: some View {
         let current = currentLineIndex
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: 12) {
             ForEach(syncedLines) { line in
                 let isCurrent = line.id == current
                 let isPast = line.id < current
                 Text(line.text)
-                    .font(.system(size: isCurrent ? 24 : 22, weight: isCurrent ? .bold : .medium))
+                    .font(.system(size: isCurrent ? 26 : 22, weight: isCurrent ? .bold : .medium))
                     .foregroundColor(
                         isCurrent ? .white :
-                        isPast ? .white.opacity(0.3) :
-                        .white.opacity(0.2)
+                        isPast ? .white.opacity(0.25) :
+                        .white.opacity(0.15)
                     )
+                    .blur(radius: isCurrent ? 0 : (isPast ? 0.3 : 0.5))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         audioPlayer.seek(to: line.time)
                     }
-                    .animation(.easeOut(duration: 0.3), value: current)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: current)
             }
         }
     }

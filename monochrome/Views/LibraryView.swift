@@ -129,11 +129,11 @@ struct LibraryView: View {
                 ForEach(availableFilters, id: \.self) { filter in
                     Button(action: { withAnimation(.easeInOut(duration: 0.15)) { selectedFilter = filter } }) {
                         Text(filter.rawValue)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(selectedFilter == filter ? Theme.primaryForeground : Theme.foreground)
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundColor(selectedFilter == filter ? .white : Theme.foreground)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 7)
-                            .background(selectedFilter == filter ? Theme.foreground : Theme.secondary)
+                            .background(selectedFilter == filter ? Theme.accent : Theme.secondary)
                             .clipShape(Capsule())
                     }
                 }

@@ -22,8 +22,8 @@ struct TrackRow: View {
             // Index or cover
             if let index = showIndex {
                 Text("\(index)")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(isCurrentTrack ? Theme.highlight : Theme.mutedForeground)
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundColor(isCurrentTrack ? Theme.accent : Theme.mutedForeground)
                     .frame(width: 28, alignment: .center)
             } else if showCover {
                 CachedAsyncImage(url: MonochromeAPI().getImageUrl(id: track.album?.cover)) { phase in
@@ -42,7 +42,7 @@ struct TrackRow: View {
                 HStack(spacing: 5) {
                     Text(track.title)
                         .font(.system(size: 15, weight: .regular))
-                        .foregroundColor(isCurrentTrack ? Theme.highlight : Theme.foreground)
+                        .foregroundColor(isCurrentTrack ? Theme.accent : Theme.foreground)
                         .lineLimit(1)
 
                     QualityBadge(tags: track.mediaMetadata?.tags)
@@ -53,12 +53,12 @@ struct TrackRow: View {
                         if #available(iOS 17.0, *) {
                             Image(systemName: "waveform")
                                 .font(.system(size: 10))
-                                .foregroundColor(Theme.highlight)
+                                .foregroundColor(Theme.accent)
                                 .symbolEffect(.variableColor.iterative, isActive: true)
                         } else {
                             Image(systemName: "waveform")
                                 .font(.system(size: 10))
-                                .foregroundColor(Theme.highlight)
+                                .foregroundColor(Theme.accent)
                         }
                     }
                     Text(track.artist?.name ?? "Unknown")
@@ -74,7 +74,7 @@ struct TrackRow: View {
             if downloadManager.isDownloaded(track.id) {
                 Image(systemName: "arrow.down.circle.fill")
                     .font(.system(size: 14))
-                    .foregroundColor(Theme.highlight)
+                    .foregroundColor(Theme.accent)
             } else if downloadManager.isDownloading(track.id) {
                 ProgressView(value: downloadManager.progress(for: track.id))
                     .progressViewStyle(.circular)
@@ -91,7 +91,7 @@ struct TrackRow: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(message.contains("Queue") ? Color.green : Color.blue)
+                .background(Theme.accent)
                 .clipShape(Capsule())
                 .transition(.scale.combined(with: .opacity))
             } else {
@@ -197,7 +197,7 @@ struct TrackOptionsSheet: View {
             OptionRow(
                 icon: "checkmark.circle.fill",
                 label: "Downloaded",
-                iconColor: Theme.highlight
+                iconColor: Theme.accent
             ) {
                 downloadManager.removeDownload(track.id)
                 isPresented = false
@@ -461,12 +461,12 @@ struct QualityBadge: View {
     var body: some View {
         if let label {
             Text(label)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundColor(Theme.background)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 1)
-                .background(Theme.mutedForeground.opacity(0.7))
-                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.accent)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(Theme.accentSubtle)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
                 .fixedSize()
         }
     }

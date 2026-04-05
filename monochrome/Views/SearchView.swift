@@ -180,11 +180,11 @@ struct SearchView: View {
                                                 }
                                             } label: {
                                                 Text(filter.rawValue)
-                                                    .font(.system(size: 13, weight: .semibold))
-                                                    .foregroundColor(mediaFilter == filter ? Theme.background : Theme.foreground)
+                                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                                    .foregroundColor(mediaFilter == filter ? .white : Theme.foreground)
                                                     .padding(.horizontal, 14)
                                                     .padding(.vertical, 6)
-                                                    .background(mediaFilter == filter ? Theme.foreground : Theme.secondary)
+                                                    .background(mediaFilter == filter ? Theme.accent : Theme.secondary)
                                                     .clipShape(Capsule())
                                             }
                                             .buttonStyle(.plain)
@@ -434,7 +434,7 @@ struct SearchView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 16))
-                    .foregroundColor(Theme.mutedForeground)
+                    .foregroundColor(isFocused ? Theme.accent : Theme.mutedForeground)
 
                 TextField("What do you want to listen to?", text: $searchText)
                     .focused($isFocused)
@@ -463,7 +463,11 @@ struct SearchView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMd))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.radiusMd)
+                    .stroke(isFocused ? Theme.accent.opacity(0.4) : Color.clear, lineWidth: 1)
+            )
             .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
             .padding(.horizontal, 16)
             .padding(.top, 12)

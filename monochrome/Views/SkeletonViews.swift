@@ -3,22 +3,23 @@ import SwiftUI
 // MARK: - Shimmer Effect
 
 struct Shimmer: ViewModifier {
-    @State private var phase: CGFloat = 0
+    @State private var phase: CGFloat = -200
 
     func body(content: Content) -> some View {
         content
             .overlay(
                 LinearGradient(
-                    colors: [.clear, .white.opacity(0.04), .clear],
+                    colors: [.clear, .white.opacity(0.06), .white.opacity(0.03), .clear],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
+                .frame(width: 200)
                 .offset(x: phase)
                 .mask(content)
             )
             .onAppear {
-                withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) {
-                    phase = 300
+                withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                    phase = 400
                 }
             }
     }
@@ -34,7 +35,13 @@ struct SkeletonPill: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: height / 2)
-            .fill(Theme.secondary)
+            .fill(
+                LinearGradient(
+                    colors: [Theme.secondary, Theme.secondary.opacity(0.6)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
             .frame(width: width, height: height)
     }
 }

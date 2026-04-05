@@ -41,21 +41,42 @@ struct MiniPlayerView: View {
                 }
                 .clipped()
             }
-            .frame(height: 56)
+            .frame(height: 60)
 
-            // Progress bar
+            // Accent progress bar
             GeometryReader { geo in
                 let progress = playbackProgress.duration > 0 ? (playbackProgress.currentTime / playbackProgress.duration) : 0
                 ZStack(alignment: .leading) {
-                    Rectangle().fill(Theme.border.opacity(0.3))
-                    Rectangle().fill(Theme.foreground)
-                        .frame(width: max(0, geo.size.width * progress))
+                    Rectangle().fill(Theme.border.opacity(0.2))
+                    Rectangle().fill(
+                        LinearGradient(
+                            colors: [Theme.accent, Theme.accent.opacity(0.6)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: max(0, geo.size.width * progress))
                 }
             }
-            .frame(height: 2)
+            .frame(height: 2.5)
         }
-        .background(Theme.secondary.opacity(0.95))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .background(
+            ZStack {
+                Theme.secondary.opacity(0.92)
+                // Subtle album art tint
+                if let coverUrl = audioPlayer.currentCoverUrl {
+                    CachedAsyncImage(url: coverUrl) { phase in
+                        if let image = phase.image {
+                            image.resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .blur(radius: 60)
+                                .opacity(0.08)
+                        }
+                    }
+                }
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .gesture(
             DragGesture(minimumDistance: 5)
                 .onChanged { value in
@@ -140,18 +161,20 @@ struct MiniPlayerView: View {
     // MARK: - Current track row (with buttons)
 
     private var currentTrackRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             CachedAsyncImage(url: audioPlayer.currentCoverUrl) { phase in
                 if let image = phase.image {
                     image.resizable().aspectRatio(contentMode: .fill)
                 } else {
-                    RoundedRectangle(cornerRadius: 4).fill(Theme.card)
+                    RoundedRectangle(cornerRadius: 6).fill(
+                        LinearGradient(colors: [Theme.card, Theme.secondary], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
                 }
             }
-            .frame(width: 40, height: 40)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .frame(width: 42, height: 42)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(audioPlayer.currentTrackTitle)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(Theme.foreground)
@@ -167,23 +190,28 @@ struct MiniPlayerView: View {
             if let track = audioPlayer.currentTrack {
                 Button(action: { libraryManager.toggleFavorite(track: track) }) {
                     Image(systemName: libraryManager.isFavorite(trackId: track.id) ? "heart.fill" : "heart")
-                        .font(.system(size: 18))
-                        .foregroundColor(libraryManager.isFavorite(trackId: track.id) ? Theme.foreground : Theme.mutedForeground)
-                        .frame(width: 44, height: 44)
+                        .font(.system(size: 17))
+                        .foregroundColor(libraryManager.isFavorite(trackId: track.id) ? Theme.accent : Theme.mutedForeground)
+                        .frame(width: 40, height: 40)
                 }
                 .buttonStyle(.plain)
             }
 
             Button(action: { audioPlayer.togglePlayPause() }) {
-                Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(Theme.foreground)
-                    .frame(width: 44, height: 44)
+                ZStack {
+                    Circle()
+                        .fill(Theme.foreground)
+                        .frame(width: 32, height: 32)
+                    Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 13))
+                        .foregroundColor(Theme.background)
+                        .offset(x: audioPlayer.isPlaying ? 0 : 1)
+                }
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
         .contentShape(Rectangle())
         .onTapGesture {
             guard !isDragging else { return }

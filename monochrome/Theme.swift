@@ -1,29 +1,35 @@
 import SwiftUI
 
 struct Theme {
-    static let background = Color(hex: "#0a0a0a")
-    static let foreground = Color(hex: "#f5f5f5")
+    static let background = Color(hex: "#050505")
+    static let foreground = Color(hex: "#f0f0f0")
     
-    static let card = Color(hex: "#141414")
-    static let cardForeground = Color(hex: "#f5f5f5")
+    static let card = Color(hex: "#111111")
+    static let cardForeground = Color(hex: "#f0f0f0")
     
-    static let primary = Color(hex: "#f5f5f5")
-    static let primaryForeground = Color(hex: "#0a0a0a")
+    static let cardElevated = Color(hex: "#181818")
     
-    static let secondary = Color(hex: "#1f1f1f")
+    static let primary = Color(hex: "#f0f0f0")
+    static let primaryForeground = Color(hex: "#050505")
+    
+    static let secondary = Color(hex: "#161616")
     static let secondaryForeground = Color(hex: "#e0e0e0")
     
-    static let muted = Color(hex: "#1f1f1f")
-    static let mutedForeground = Color(hex: "#a0a0a0")
+    static let muted = Color(hex: "#1a1a1a")
+    static let mutedForeground = Color(hex: "#8a8a8a")
     
-    static let border = Color(hex: "#2a2a2a")
-    static let input = Color(hex: "#1f1f1f")
-    static let highlight = Color(hex: "#f5f5f5")
+    static let border = Color(hex: "#222222")
+    static let input = Color(hex: "#161616")
+    static let highlight = Color(hex: "#f0f0f0")
     
-    static let radiusSm: CGFloat = 4.0
-    static let radiusMd: CGFloat = 8.0
-    static let radiusLg: CGFloat = 12.0
-    static let radiusXl: CGFloat = 16.0
+    static let accent = Color(hex: "#6366f1")
+    static let accentSubtle = Color(hex: "#6366f1").opacity(0.15)
+    
+    static let radiusSm: CGFloat = 6.0
+    static let radiusMd: CGFloat = 10.0
+    static let radiusLg: CGFloat = 14.0
+    static let radiusXl: CGFloat = 20.0
+    static let radiusFull: CGFloat = 100.0
 }
 
 extension Color {

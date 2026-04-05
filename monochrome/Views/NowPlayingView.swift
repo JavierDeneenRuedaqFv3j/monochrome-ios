@@ -11,8 +11,8 @@ struct NowPlayingView: View {
     @State private var showQueue = false
     @State private var isDraggingSlider = false
     @State private var localSeekValue: Double = 0
+    @State private var artScale: CGFloat = 1.0
 
-    // Real screen dimensions — always correct regardless of view hierarchy
     private let screenW = UIScreen.main.bounds.width
     private let screenH = UIScreen.main.bounds.height
     private var safeT: CGFloat {
@@ -30,74 +30,57 @@ struct NowPlayingView: View {
 
     var body: some View {
         let usable = screenH - safeT - safeB
-        let padX: CGFloat = 24
-        // Art: 42% of usable height, capped at content width
-        let artSize = min(screenW - padX * 2, usable * 0.42)
-
-        // Layout budget (% of usable height):
-        //   handle  3%  +  topBar  6%  +  gap  2%
-        //   art    42%  (or less if width-capped)
-        //   gap     3%  +  info   7%  +  gap  1.5%
-        //   prog    7%  +  gap  0.5%  +  ctrl 11%
-        //   gap     1%  +  queue  5%
-        //   TOTAL: 89% → 11% breathing room
+        let padX: CGFloat = 28
+        let artSize = min(screenW - padX * 2, usable * 0.40)
 
         ZStack {
             backgroundLayer
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 0) {
-                    // -- Handle: 3% --
+                    // Handle
                     Capsule()
-                        .fill(.white.opacity(0.4))
-                        .frame(width: 36, height: 5)
+                        .fill(.white.opacity(0.3))
+                        .frame(width: 40, height: 5)
                         .frame(height: usable * 0.03)
 
-                    // -- Top bar: 6% --
+                    // Top bar
                     topBar
                         .frame(height: usable * 0.06)
 
-                    // -- Gap: 2% --
-                    Color.clear
-                        .frame(height: usable * 0.02)
+                    Color.clear.frame(height: usable * 0.025)
 
-                    // -- Album art: 42% (capped at width) --
+                    // Album art with scale animation
                     albumArt
                         .frame(width: artSize, height: artSize)
+                        .scaleEffect(audioPlayer.isPlaying ? 1.0 : 0.92)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: audioPlayer.isPlaying)
 
-                    // -- Gap: 3% --
-                    Color.clear
-                        .frame(height: usable * 0.03)
+                    Color.clear.frame(height: usable * 0.035)
 
-                    // -- Track info: 7% --
+                    // Track info
                     trackInfo
-                        .frame(height: usable * 0.07)
+                        .frame(minHeight: usable * 0.07)
 
-                    // -- Gap: 1.5% --
-                    Color.clear
-                        .frame(height: usable * 0.015)
+                    Color.clear.frame(height: usable * 0.02)
 
-                    // -- Progress: 7% --
+                    // Progress
                     progressBar
                         .frame(height: usable * 0.07)
 
-                    // -- Gap: 0.5% --
-                    Color.clear
-                        .frame(height: usable * 0.005)
+                    Color.clear.frame(height: usable * 0.005)
 
-                    // -- Controls: 11% --
+                    // Controls
                     controls
                         .frame(height: usable * 0.11)
 
-                    // -- Gap: 1% --
-                    Color.clear
-                        .frame(height: usable * 0.01)
+                    Color.clear.frame(height: usable * 0.015)
 
-                    // -- Queue: 5% --
+                    // Secondary controls
                     queueInfo
                         .frame(height: usable * 0.05)
 
-                    // -- Lyrics --
+                    // Lyrics
                     LyricsView()
                         .padding(.top, 40)
                         .padding(.bottom, safeB + 40)
@@ -132,13 +115,19 @@ struct NowPlayingView: View {
                     if let image = phase.image {
                         image.resizable()
                             .aspectRatio(contentMode: .fill)
-                            .blur(radius: 80)
-                            .brightness(-0.4)
-                            .scaleEffect(1.5)
+                            .blur(radius: 100)
+                            .brightness(-0.45)
+                            .saturation(1.3)
+                            .scaleEffect(1.6)
                     }
                 }
             }
-            Color.black.opacity(0.25)
+            // Gradient overlay for depth
+            LinearGradient(
+                colors: [.black.opacity(0.3), .clear, .black.opacity(0.5)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
         }
         .frame(width: screenW, height: screenH)
     }
@@ -153,29 +142,31 @@ struct NowPlayingView: View {
                 }
             }) {
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
-                    .frame(width: 44, height: 44)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.7))
+                    .frame(width: 36, height: 36)
+                    .background(.ultraThinMaterial.opacity(0.4))
+                    .clipShape(Circle())
             }
 
             Spacer()
 
             VStack(spacing: 2) {
                 Text("NOW PLAYING")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.6))
-                    .tracking(1)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.5))
+                    .tracking(1.5)
                 if let album = audioPlayer.currentTrack?.album?.title {
                     Text(album)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.white.opacity(0.7))
                         .lineLimit(1)
                 }
             }
 
             Spacer()
 
-            Color.clear.frame(width: 44, height: 44)
+            Color.clear.frame(width: 36, height: 36)
         }
     }
 
@@ -187,13 +178,24 @@ struct NowPlayingView: View {
                 image.resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Theme.card)
+                RoundedRectangle(cornerRadius: Theme.radiusLg)
+                    .fill(
+                        LinearGradient(
+                            colors: [Theme.card, Theme.secondary],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .aspectRatio(1, contentMode: .fit)
+                    .overlay(
+                        Image(systemName: "music.note")
+                            .font(.system(size: 40))
+                            .foregroundColor(Theme.mutedForeground.opacity(0.3))
+                    )
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .shadow(color: .black.opacity(0.5), radius: 30, y: 15)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusLg))
+        .shadow(color: .black.opacity(0.6), radius: 40, y: 20)
         .onTapGesture {
             guard let album = audioPlayer.currentTrack?.album else { return }
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
@@ -209,9 +211,9 @@ struct NowPlayingView: View {
 
     private var trackInfo: some View {
         HStack(alignment: .center, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(audioPlayer.currentTrackTitle)
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 22, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
 
@@ -226,14 +228,14 @@ struct NowPlayingView: View {
                     }) {
                         Text(audioPlayer.currentArtistName)
                             .font(.system(size: 15))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(.white.opacity(0.55))
                             .lineLimit(1)
                     }
                     .buttonStyle(.plain)
                 } else {
                     Text(audioPlayer.currentArtistName)
                         .font(.system(size: 15))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(.white.opacity(0.55))
                         .lineLimit(1)
                 }
             }
@@ -243,7 +245,8 @@ struct NowPlayingView: View {
                 Button(action: { libraryManager.toggleFavorite(track: track) }) {
                     Image(systemName: libraryManager.isFavorite(trackId: track.id) ? "heart.fill" : "heart")
                         .font(.system(size: 22))
-                        .foregroundColor(libraryManager.isFavorite(trackId: track.id) ? .white : .white.opacity(0.5))
+                        .foregroundColor(libraryManager.isFavorite(trackId: track.id) ? Theme.accent : .white.opacity(0.4))
+                        .symbolEffect(.bounce, value: libraryManager.isFavorite(trackId: track.id))
                 }
                 .frame(width: 44, height: 44)
 
@@ -272,11 +275,11 @@ struct NowPlayingView: View {
             } else if isDownloaded {
                 Image(systemName: "arrow.down.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.accent)
             } else {
                 Image(systemName: "arrow.down.circle")
                     .font(.system(size: 22))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(.white.opacity(0.4))
             }
         }
         .frame(width: 44, height: 44)
@@ -285,18 +288,52 @@ struct NowPlayingView: View {
     // MARK: - Progress
 
     private var progressBar: some View {
-        VStack(spacing: 6) {
-            Slider(
-                value: $localSeekValue,
-                in: 0...(playbackProgress.duration > 0 ? playbackProgress.duration : 1),
-                onEditingChanged: { editing in
-                    isDraggingSlider = editing
-                    if !editing {
-                        audioPlayer.seek(to: localSeekValue)
-                    }
+        VStack(spacing: 8) {
+            // Custom progress track
+            GeometryReader { geo in
+                let progress = playbackProgress.duration > 0
+                    ? (isDraggingSlider ? localSeekValue : playbackProgress.currentTime) / playbackProgress.duration
+                    : 0
+
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(.white.opacity(0.12))
+                        .frame(height: isDraggingSlider ? 6 : 4)
+
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Theme.accent, Theme.accent.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(0, geo.size.width * progress), height: isDraggingSlider ? 6 : 4)
+
+                    // Thumb
+                    Circle()
+                        .fill(.white)
+                        .frame(width: isDraggingSlider ? 14 : 0, height: isDraggingSlider ? 14 : 0)
+                        .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                        .offset(x: max(0, geo.size.width * progress - 7))
                 }
-            )
-            .tint(.white)
+                .frame(height: 14)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            isDraggingSlider = true
+                            let ratio = max(0, min(1, value.location.x / geo.size.width))
+                            localSeekValue = ratio * (playbackProgress.duration > 0 ? playbackProgress.duration : 1)
+                        }
+                        .onEnded { _ in
+                            isDraggingSlider = false
+                            audioPlayer.seek(to: localSeekValue)
+                        }
+                )
+                .animation(.easeOut(duration: 0.15), value: isDraggingSlider)
+            }
+            .frame(height: 14)
 
             HStack {
                 Text(formatTime(isDraggingSlider ? localSeekValue : playbackProgress.currentTime))
@@ -304,7 +341,7 @@ struct NowPlayingView: View {
                 Text("-" + formatTime(max(0, playbackProgress.duration - (isDraggingSlider ? localSeekValue : playbackProgress.currentTime))))
             }
             .font(.system(size: 11, weight: .medium, design: .monospaced))
-            .foregroundColor(.white.opacity(0.5))
+            .foregroundColor(.white.opacity(0.4))
         }
     }
 
@@ -316,18 +353,23 @@ struct NowPlayingView: View {
 
             Button(action: { audioPlayer.previousTrack() }) {
                 Image(systemName: "backward.fill")
-                    .font(.system(size: 28))
-                    .foregroundColor(audioPlayer.hasPreviousTrack ? .white : .white.opacity(0.3))
+                    .font(.system(size: 30))
+                    .foregroundColor(audioPlayer.hasPreviousTrack ? .white : .white.opacity(0.2))
             }
             .disabled(!audioPlayer.hasPreviousTrack)
 
             Spacer()
 
+            // Play/Pause with accent ring
             Button(action: { audioPlayer.togglePlayPause() }) {
                 ZStack {
-                    Circle().fill(.white).frame(width: 64, height: 64)
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 68, height: 68)
+                        .shadow(color: Theme.accent.opacity(0.3), radius: 20, y: 4)
+
                     Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 26))
+                        .font(.system(size: 28))
                         .foregroundColor(.black)
                         .offset(x: audioPlayer.isPlaying ? 0 : 2)
                 }
@@ -337,8 +379,8 @@ struct NowPlayingView: View {
 
             Button(action: { audioPlayer.nextTrack() }) {
                 Image(systemName: "forward.fill")
-                    .font(.system(size: 28))
-                    .foregroundColor(audioPlayer.hasNextTrack ? .white : .white.opacity(0.3))
+                    .font(.system(size: 30))
+                    .foregroundColor(audioPlayer.hasNextTrack ? .white : .white.opacity(0.2))
             }
             .disabled(!audioPlayer.hasNextTrack)
 
@@ -352,8 +394,8 @@ struct NowPlayingView: View {
         HStack {
             Button(action: { audioPlayer.toggleShuffle() }) {
                 Image(systemName: "shuffle")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(.white.opacity(audioPlayer.isShuffled ? 1.0 : 0.4))
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(audioPlayer.isShuffled ? Theme.accent : .white.opacity(0.3))
             }
             .frame(width: 44, height: 44)
 
@@ -361,9 +403,17 @@ struct NowPlayingView: View {
 
             if !audioPlayer.queuedTracks.isEmpty {
                 Button(action: { showQueue = true }) {
-                    Text("\(audioPlayer.queuedTracks.count) track\(audioPlayer.queuedTracks.count > 1 ? "s" : "") in queue")
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.4))
+                    HStack(spacing: 4) {
+                        Text("\(audioPlayer.queuedTracks.count)")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                        Text("in queue")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(.white.opacity(0.35))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(.white.opacity(0.06))
+                    .clipShape(Capsule())
                 }
             }
 
@@ -371,15 +421,15 @@ struct NowPlayingView: View {
 
             Button(action: { audioPlayer.cycleRepeatMode() }) {
                 Image(systemName: audioPlayer.repeatMode == .one ? "repeat.1" : "repeat")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(.white.opacity(audioPlayer.repeatMode != .off ? 1.0 : 0.4))
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(audioPlayer.repeatMode != .off ? Theme.accent : .white.opacity(0.3))
             }
             .frame(width: 44, height: 44)
 
             Button(action: { showQueue = true }) {
                 Image(systemName: "list.bullet")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white.opacity(0.3))
             }
             .frame(width: 44, height: 44)
         }
