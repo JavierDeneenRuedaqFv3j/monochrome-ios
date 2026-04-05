@@ -243,10 +243,17 @@ struct NowPlayingView: View {
 
             if let track = audioPlayer.currentTrack {
                 Button(action: { libraryManager.toggleFavorite(track: track) }) {
-                    Image(systemName: libraryManager.isFavorite(trackId: track.id) ? "heart.fill" : "heart")
-                        .font(.system(size: 22))
-                        .foregroundColor(libraryManager.isFavorite(trackId: track.id) ? Theme.accent : .white.opacity(0.4))
-                        .symbolEffect(.bounce, value: libraryManager.isFavorite(trackId: track.id))
+                    let isFav = libraryManager.isFavorite(trackId: track.id)
+                    if #available(iOS 17.0, *) {
+                        Image(systemName: isFav ? "heart.fill" : "heart")
+                            .font(.system(size: 22))
+                            .foregroundColor(isFav ? Theme.accent : .white.opacity(0.4))
+                            .symbolEffect(.bounce, value: isFav)
+                    } else {
+                        Image(systemName: isFav ? "heart.fill" : "heart")
+                            .font(.system(size: 22))
+                            .foregroundColor(isFav ? Theme.accent : .white.opacity(0.4))
+                    }
                 }
                 .frame(width: 44, height: 44)
 
